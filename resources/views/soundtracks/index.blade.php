@@ -60,7 +60,9 @@
                     <div class="col-md-2 text-secondary small font-monospace">
                         --:--
                     </div>
-                    
+                    <a href="{{ route('soundtracks.edit', $track) }}" class="btn btn-link text-secondary hover-white p-0 me-2" title="Settings">
+                        <i class="bi bi-sliders"></i>
+                    </a>
                     <div class="col-md-2 text-end d-flex justify-content-end gap-2">
                         <button class="btn btn-link text-secondary hover-white p-0 me-2" title="Settings"><i class="bi bi-sliders"></i></button>
                         
