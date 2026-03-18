@@ -60,16 +60,33 @@
                     <button class="btn btn-sm btn-dark border-secondary rounded-0 uppercase tracking-widest w-100 dropdown-toggle" type="button" data-bs-toggle="dropdown" style="font-size: 10px;">
                         OPTIONS
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-dark rounded-0 border-secondary shadow-lg mt-1">
+                    <ul class="dropdown-menu dropdown-menu-dark rounded-0 border-secondary shadow-lg mt-1" style="min-width: 200px;">
+                        <li><h6 class="dropdown-header text-secondary tracking-widest" style="font-size: 9px;">CORE ENGINE</h6></li>
                         <li><a class="dropdown-item small tracking-widest uppercase text-info py-2" style="font-size: 10px;" href="#"><i class="bi bi-cpu me-2 fs-6 align-middle"></i> Render Single</a></li>
-                        <li><a class="dropdown-item small tracking-widest uppercase py-2" style="font-size: 10px;" href="#"><i class="bi bi-arrow-repeat me-2 fs-6 align-middle"></i> Swap Seed</a></li>
+                        <li><a class="dropdown-item small tracking-widest uppercase py-2" style="font-size: 10px;" href="#"><i class="bi bi-arrow-repeat me-2 fs-6 align-middle"></i> Swap AI Seed</a></li>
+                        
                         <li><hr class="dropdown-divider border-secondary"></li>
+                        
+                        <li><h6 class="dropdown-header text-secondary tracking-widest" style="font-size: 9px;">AI LOCALIZATION (LK)</h6></li>
+                        <li>
+                            <button class="dropdown-item small tracking-widest uppercase text-warning py-2" style="font-size: 10px;" onclick="translateToSinhala({{ $scene->id }})">
+                                <i class="bi bi-translate me-2 fs-6 align-middle"></i> Script to Sinhala
+                            </button>
+                        </li>
+                        <li>
+                            <button class="dropdown-item small tracking-widest uppercase text-warning py-2" style="font-size: 10px;" onclick="generateSinhalaAudio({{ $scene->id }})">
+                                <i class="bi bi-mic-fill me-2 fs-6 align-middle"></i> Gen Sinhala Audio
+                            </button>
+                        </li>
+
+                        <li><hr class="dropdown-divider border-secondary"></li>
+                        
                         <li>
                             <form action="{{ route('scenes.destroy', $scene) }}" method="POST" onsubmit="return confirm('CRITICAL: Purge this sequence and its generated assets?');">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="dropdown-item small tracking-widest uppercase text-danger py-2" style="font-size: 10px;">
-                                    <i class="bi bi-trash3 me-2 fs-6 align-middle"></i> Delete
+                                    <i class="bi bi-trash3 me-2 fs-6 align-middle"></i> Delete Segment
                                 </button>
                             </form>
                         </li>
