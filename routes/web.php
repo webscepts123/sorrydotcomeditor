@@ -83,4 +83,10 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/settings/api-refresh', 'refreshApiKey')->name('settings.api-refresh');
     });
 
+    Route::prefix('tools')->name('tools.')->group(function () {
+        Route::get('/sync-face', [App\Http\Controllers\ToolController::class, 'syncFace'])->name('sync-face');
+        Route::get('/gen-score', [App\Http\Controllers\ToolController::class, 'genScore'])->name('gen-score');
+        Route::get('/script', [App\Http\Controllers\ToolController::class, 'script'])->name('script');
+    });
+
 });

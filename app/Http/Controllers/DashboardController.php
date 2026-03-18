@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Project;
 use App\Models\Editor;
+use App\Models\Scene;
 use App\Models\VideoClip;
 
 class DashboardController extends Controller
@@ -15,49 +16,37 @@ class DashboardController extends Controller
      */
     public function index()
     {
-        // 1. Get the current active project for the logged-in user
-        // We assume 'Void Shadow' is the primary project for now
-        $project = Auth::user()->projects()
-            ->with(['editors', 'scenes'])
-            ->latest()
-            ->first();
-
-        // 2. Fallback if no project exists yet (Prevents errors)
-        if (!$project) {
-            return redirect()->route('projects.create')
-                ->with('info', 'Please create your first movie project to access the dashboard.');
-        }
-
-        // 3. Calculate Movie Stats
-        // Total minutes targeted: 150 (2.5 hours)
-        $totalMinutesTarget = 150;
+        // 1. Get the Active Production (Most recently updated project)
+        $activeProject = Project::withCount('scenes')->latest('updated_at')->first();
         
-        // Count completed 15-second clips
-        $completedClipsCount = VideoClip::whereHas('scene', function($query) use ($project) {
-            $query->where('project_id', $project->id);
-        })->where('status', 'completed')->count();
+        // Calculate minutes based on 15 seconds per scene (Seedance standard)
+        $totalMinutes = $activeProject ? ($activeProject->scenes_count * 15) / 60 : 0;
+        $progressPercent = min(100, ($totalMinutes / 150) * 100); // 150 mins = 2.5 hours
 
-        // Convert clips to minutes (4 clips = 1 minute)
-        $currentMinutes = $completedClipsCount / 4;
-        $progressPercent = ($currentMinutes / $totalMinutesTarget) * 100;
+        // 2. Get AI Render Queue Status
+        $renderingScene = Scene::whereIn('status', ['Rendering', 'Processing'])->latest()->first();
+        $nextScene = Scene::whereIn('status', ['Draft', 'Queued'])->oldest('order_index')->first();
 
-        // 4. Fetch the Editors specifically assigned to this project
-        $editors = $project->editors;
+        // 3. Get Actual Server NVMe Storage
+        $diskPath = storage_path('app/public');
+        $totalSpace = function_exists('disk_total_space') ? @disk_total_space($diskPath) : 1;
+        $freeSpace = function_exists('disk_free_space') ? @disk_free_space($diskPath) : 1;
+        
+        $usedSpace = $totalSpace - $freeSpace;
+        $storagePercent = ($totalSpace > 0) ? ($usedSpace / $totalSpace) * 100 : 0;
 
-        // 5. Simulate Server/VDS Data (In 2026, you'd pull this via API or shell_exec)
-        $serverStats = [
-            'storage_used' => '420GB',
-            'storage_total' => '800GB',
-            'storage_percent' => 52,
-            'node' => 'Contabo-SL-01'
-        ];
+        // Convert to GB for the UI
+        $usedGB = round($usedSpace / 1073741824, 2);
+        $totalGB = round($totalSpace / 1073741824, 2);
+
+        // 4. Load Team
+        $editors = Editor::latest()->take(5)->get(); // Adjust model name if needed
 
         return view('dashboard', compact(
-            'project', 
-            'editors', 
-            'progressPercent', 
-            'currentMinutes', 
-            'serverStats'
+            'activeProject', 'totalMinutes', 'progressPercent', 
+            'renderingScene', 'nextScene', 
+            'usedGB', 'totalGB', 'storagePercent', 
+            'editors'
         ));
     }
 }
