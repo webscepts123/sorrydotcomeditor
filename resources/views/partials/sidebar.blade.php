@@ -18,6 +18,12 @@
             </a>
         </li>
         <li>
+            @php $activeSidebarProject = \App\Models\Project::latest('updated_at')->first(); @endphp
+            <a href="{{ $activeSidebarProject ? route('projects.timeline', $activeSidebarProject->id) : route('projects.index') }}" class="nav-link {{ request()->routeIs('projects.timeline') ? 'active bg-white text-black' : 'text-white' }} rounded-0 mb-2 tracking-widest small">
+                TIMELINE
+            </a>
+        </li>
+        <li>
             <a href="{{ route('scenes.index') }}" class="nav-link {{ request()->routeIs('scenes.*') ? 'active bg-white text-black' : 'text-white' }} rounded-0 mb-2 tracking-widest small">
                 SCENES
             </a>
@@ -37,6 +43,7 @@
                 SOUNDTRACKS
             </a>
         </li>
+       
 
         <li class="nav-item mb-2 border border-secondary bg-dark">
             <a href="#productionTools" data-bs-toggle="collapse" aria-expanded="false" class="nav-link text-white rounded-0 d-flex justify-content-between align-items-center tracking-widest small">

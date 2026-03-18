@@ -53,6 +53,16 @@ class ProjectController extends Controller
         return view('projects.show', compact('project', 'totalClips'));
     }
 
+    public function timeline(Project $project)
+    {
+        // Load scenes strictly ordered by their timeline index
+        $project->load(['scenes' => function ($query) {
+            $query->orderBy('order_index');
+        }]);
+
+        return view('projects.timeline', compact('project'));
+    }
+
     public function destroy(Project $project)
     {
         // If you have scene files/videos on your Contabo server, delete them here first
