@@ -42,13 +42,14 @@ class ProjectController extends Controller
     }
     public function show(Project $project)
     {
-        // Eager load scenes and their video clips to prevent slow loading
+        // Eager load scenes strictly ordered by their timeline index
+        // We removed 'scenes.videoClips' because we use video_path on the scene itself
         $project->load(['scenes' => function($query) {
             $query->orderBy('order_index', 'asc');
-        }, 'scenes.videoClips']);
+        }]);
     
-        // Calculate total clips for the 2.5-hour target
-        $totalClips = $project->scenes->flatMap->videoClips->count();
+        // Calculate total rendered clips (scenes that have a video_path)
+        $totalClips = $project->scenes->whereNotNull('video_path')->count();
         
         return view('projects.show', compact('project', 'totalClips'));
     }
@@ -78,6 +79,15 @@ class ProjectController extends Controller
         $project->load(['scenes', 'characters']);
         
         return view('projects.editor', compact('project'));
+    }
+
+    public function videoeditor(Project $project)
+    {
+        // Eager load scenes and characters for the editor view
+        $project->load(['scenes', 'characters']);
+        
+        // This looks for resources/views/projects/videoeditor.blade.php
+        return view('projects.videoeditor', compact('project'));
     }
     public function create()
     {

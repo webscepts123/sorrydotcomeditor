@@ -153,7 +153,7 @@
         <div class="col-md-5 col-lg-4">
             
             <div class="studio-logo">
-                SORRY<span>DOT</span>COM
+                VOID<span>SHADOW</span>EDITOR
             </div>
 
             <div class="login-card" id="card">

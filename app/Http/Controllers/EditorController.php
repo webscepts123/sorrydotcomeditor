@@ -46,4 +46,50 @@ class EditorController extends Controller
 
         return redirect()->route('editors.index')->with('success', 'Staff member added to the roster.');
     }
+
+    /**
+     * Show the edit form for the staff member.
+     */
+    public function edit(Editor $editor)
+    {
+        return view('editors.edit', compact('editor'));
+    }
+
+    /**
+     * Update the staff member's credentials.
+     */
+    public function update(Request $request, Editor $editor)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:editors,email,' . $editor->id,
+            'role' => 'required|string',
+        ]);
+
+        $editor->update($validated);
+
+        return redirect()->route('editors.index')
+            ->with('success', 'EDITOR IDENTITY UPDATED.');
+    }
+
+    /**
+     * Terminate the editor record.
+     */
+    public function destroy(Editor $editor)
+    {
+        // Detach from projects before deleting
+        $editor->projects()->detach();
+        $editor->delete();
+
+        return redirect()->route('editors.index')
+            ->with('success', 'EDITOR RECORD PURGED FROM SYSTEM.');
+    }
+
+    public function show(Editor $editor)
+    {
+        // Load the projects associated with this editor via the pivot table
+        $editor->load('projects');
+
+        return view('editors.show', compact('editor'));
+    }
 }

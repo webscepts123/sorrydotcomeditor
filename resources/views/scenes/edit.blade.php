@@ -4,7 +4,7 @@
 <div class="container-fluid">
     <div class="mb-5 border-bottom border-secondary pb-4">
         <h6 class="text-secondary mb-1 uppercase tracking-widest" style="font-size: 10px;">PRODUCTION / TIMELINE</h6>
-        <h2 class="fw-light" style="font-family: 'Syncopate'; letter-spacing: 4px;">INITIALIZE SCENE</h2>
+        <h2 class="fw-light" style="font-family: 'Syncopate'; letter-spacing: 4px;">RECONFIGURE SEQUENCE</h2>
     </div>
 
     @if ($errors->any())
@@ -18,8 +18,10 @@
         </div>
     @endif
 
-    <form action="{{ route('scenes.store') }}" method="POST">
+    <form action="{{ route('scenes.update', $scene) }}" method="POST">
         @csrf
+        @method('PUT')
+        
         <div class="row g-5">
             <div class="col-lg-7">
                 <div class="bg-black border border-secondary p-5 shadow-sm">
@@ -29,9 +31,8 @@
                         <div class="col-md-8 mb-4 mb-md-0">
                             <label class="form-label text-secondary small tracking-widest uppercase">Target Production</label>
                             <select name="project_id" class="form-select bg-black border-0 border-bottom border-secondary rounded-0 text-white p-2" required>
-                                <option value="">SELECT PROJECT...</option>
                                 @foreach($projects as $proj)
-                                    <option value="{{ $proj->id }}" {{ (old('project_id') ?? request('project')) == $proj->id ? 'selected' : '' }}>
+                                    <option value="{{ $proj->id }}" {{ $scene->project_id == $proj->id ? 'selected' : '' }}>
                                         {{ strtoupper($proj->title) }}
                                     </option>
                                 @endforeach
@@ -40,21 +41,29 @@
                         
                         <div class="col-md-4">
                             <label class="form-label text-secondary small tracking-widest uppercase">Timeline Index</label>
-                            <input type="number" name="order_index" value="{{ old('order_index') }}" min="1" step="1" class="form-control bg-transparent border-0 border-bottom border-secondary rounded-0 text-white p-2 font-monospace" placeholder="1" required>
-                            <small class="text-secondary mt-1 d-block" style="font-size: 10px;">Position in the 2.5hr cut (e.g. 1).</small>
+                            <input type="number" name="order_index" value="{{ $scene->order_index }}" min="1" step="1" class="form-control bg-transparent border-0 border-bottom border-secondary rounded-0 text-white p-2 font-monospace" required>
                         </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label text-secondary small tracking-widest uppercase">Sequence Status</label>
+                        <select name="status" class="form-select bg-black border-0 border-bottom border-secondary rounded-0 text-white p-2">
+                            <option value="Draft" {{ $scene->status == 'Draft' ? 'selected' : '' }}>Draft</option>
+                            <option value="Ready" {{ $scene->status == 'Ready' ? 'selected' : '' }}>Ready</option>
+                            <option value="Processing" {{ $scene->status == 'Processing' ? 'selected' : '' }}>Processing</option>
+                            <option value="failed" {{ $scene->status == 'failed' ? 'selected' : '' }}>Failed</option>
+                        </select>
                     </div>
 
                     <div class="mb-5">
                         <label class="form-label text-secondary small tracking-widest uppercase">Action / Script Segment</label>
-                        <textarea name="script_segment" rows="5" class="form-control bg-transparent border border-secondary rounded-0 text-white p-3 italic" 
-                                  placeholder="Describe the action. E.g., 'Camera pans across the neon-lit streets of Colombo as Silas lights a cigarette...'" required>{{ old('script_segment') }}</textarea>
+                        <textarea name="script_segment" rows="5" class="form-control bg-transparent border border-secondary rounded-0 text-white p-3 italic" required>{{ $scene->script_segment }}</textarea>
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center">
-                        <a href="javascript:history.back()" class="text-secondary text-decoration-none small tracking-widest uppercase hover-white">Cancel</a>
+                        <a href="{{ route('projects.timeline', $scene->project_id) }}" class="text-secondary text-decoration-none small tracking-widest uppercase hover-white">Cancel Changes</a>
                         <button type="submit" class="btn btn-white bg-white text-black rounded-0 px-5 py-3 fw-bold tracking-widest uppercase">
-                            LOCK SEQUENCE
+                            UPDATE SEQUENCE
                         </button>
                     </div>
                 </div>
@@ -62,14 +71,14 @@
 
             <div class="col-lg-5">
                 <div class="border border-secondary bg-black p-4 h-100">
-                    <h6 class="text-white small tracking-widest uppercase mb-3">AI Cast Assignment</h6>
-                    <p class="text-secondary small italic mb-4">Select the characters appearing in this scene. Their AI Seeds will be automatically injected into the Seedance 2.0 prompt.</p>
+                    <h6 class="text-white small tracking-widest uppercase mb-3">Modify Cast Assignment</h6>
+                    <p class="text-secondary small italic mb-4">Update the characters appearing in this sequence.</p>
                     
                     <div class="list-group rounded-0">
                         @forelse($characters as $character)
                         <label class="list-group-item bg-dark border-secondary text-white d-flex align-items-center mb-2 transition-hover p-2">
                             <input class="form-check-input me-3 bg-black border-secondary" type="checkbox" name="characters[]" value="{{ $character->id }}"
-                                {{ (is_array(old('characters')) && in_array($character->id, old('characters'))) ? 'checked' : '' }}>
+                                {{ $scene->characters->contains($character->id) ? 'checked' : '' }}>
                             
                             @if($character->reference_image)
                                 <img src="{{ asset('storage/' . $character->reference_image) }}" alt="{{ $character->name }}" class="rounded-circle border border-secondary me-3 object-fit-cover" style="width: 40px; height: 40px;">
@@ -82,16 +91,14 @@
                             <div class="flex-grow-1">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="d-block small fw-bold uppercase">{{ $character->name }}</span>
-                                    @if($character->role)
-                                        <span class="badge border border-secondary text-secondary uppercase" style="font-size: 8px;">{{ $character->role }}</span>
-                                    @endif
+                                    <span class="badge border border-secondary text-secondary uppercase" style="font-size: 8px;">{{ $character->role }}</span>
                                 </div>
-                                <code class="text-info" style="font-size: 10px;">{{ $character->ai_tag ?? 'NO_TAG_ASSIGNED' }}</code>
+                                <code class="text-info" style="font-size: 10px;">{{ $character->ai_tag }}</code>
                             </div>
                         </label>
                         @empty
                         <div class="text-center p-3 border border-dashed border-secondary">
-                            <span class="text-secondary small uppercase tracking-widest">No Cast Initialized in System.</span>
+                            <span class="text-secondary small uppercase tracking-widest">No Cast Initialized.</span>
                         </div>
                         @endforelse
                     </div>
@@ -104,6 +111,7 @@
 <style>
     .uppercase { text-transform: uppercase; }
     .tracking-widest { letter-spacing: 0.2em; }
+    .italic { font-style: italic; }
     .font-monospace { font-family: 'Courier New', Courier, monospace; }
     .object-fit-cover { object-fit: cover; }
     .form-control:focus, .form-select:focus { 

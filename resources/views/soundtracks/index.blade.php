@@ -1,7 +1,6 @@
 @extends('layouts.admin')
 
 @section('content')
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-end mb-5 border-bottom border-secondary pb-4">
         <div>

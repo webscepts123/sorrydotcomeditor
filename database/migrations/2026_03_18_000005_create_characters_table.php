@@ -13,14 +13,15 @@ return new class extends Migration
     {
         Schema::create('characters', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('movie_id')->constrained()->onDelete('cascade');
+            $table->foreignId('project_id')->constrained('projects')->onDelete('cascade');
             $table->string('name');
-            $table->string('reference_image')->comment('Path to the @Character image');
-            $table->text('description');
+            $table->string('ai_tag')->nullable();
+            $table->string('role')->nullable();
+            $table->string('reference_image')->nullable();
+            $table->text('description')->nullable();
             $table->timestamps();
         });
     }
-
     /**
      * Reverse the migrations.
      */

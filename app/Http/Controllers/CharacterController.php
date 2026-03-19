@@ -20,6 +20,13 @@ class CharacterController extends Controller
         $characters = Character::latest()->get(); // Add this
         return view('characters.create', compact('characters')); 
     }
+    public function show(Character $character)
+    {
+        // Load the scenes this character appears in so we can list them
+        $character->load('scenes');
+        
+        return view('characters.show', compact('character'));
+    }
 
     public function store(Request $request)
     {
@@ -28,7 +35,7 @@ class CharacterController extends Controller
             'ai_tag' => 'nullable|string|max:100',
             'role' => 'required|string',
             'description' => 'nullable|string',
-            'reference_image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            
         ]);
 
         // Handle the Image Upload for the Reference Portrait

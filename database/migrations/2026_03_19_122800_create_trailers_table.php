@@ -11,15 +11,18 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('scenes', function (Blueprint $table) {
+        Schema::create('trailers', function (Blueprint $table) {
             $table->id();
             
-            // This line is what caused the error because 'projects' wasn't ready yet
+            // Link to the main Void Shadow project
             $table->foreignId('project_id')->constrained()->onDelete('cascade');
             
-            $table->integer('order_index')->default(0);
-            $table->text('script_segment')->nullable();
-            $table->enum('status', ['pending', 'generating', 'ready', 'failed'])->default('pending');
+            $table->string('title');
+            $table->text('description')->nullable();
+            $table->string('video_path')->nullable();
+            $table->string('duration')->nullable(); // e.g., "01:30"
+            $table->enum('status', ['Draft', 'Processing', 'Ready', 'Published'])->default('Draft');
+            
             $table->timestamps();
         });
     }
@@ -29,6 +32,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('scenes');
+        Schema::dropIfExists('trailers');
     }
 };

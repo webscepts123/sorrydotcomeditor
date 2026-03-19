@@ -13,4 +13,8 @@ class Scene extends Model
     {
         return $this->belongsTo(Project::class);
     }
+    public function characters()
+    {
+        return $this->belongsToMany(Character::class);
+    }
 }

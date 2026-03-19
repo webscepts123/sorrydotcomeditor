@@ -9,6 +9,7 @@ use App\Http\Controllers\CharacterController;
 use App\Http\Controllers\EditorController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SoundtrackController;
+use App\Http\Controllers\TrailerController; // <-- Added TrailerController
 
 /*
 |--------------------------------------------------------------------------
@@ -40,6 +41,7 @@ Route::middleware(['auth'])->group(function () {
         // High-Level Visual Interfaces
         Route::get('/editor', [ProjectController::class, 'editor'])->name('projects.editor');
         Route::get('/timeline', [ProjectController::class, 'timeline'])->name('projects.timeline');
+        Route::get('/videoeditor', [ProjectController::class, 'videoeditor'])->name('projects.videoeditor');
         
         // Orchestration & Rendering Commands
         Route::post('/render-batch', [ProjectController::class, 'renderBatch'])->name('projects.render-batch');
@@ -64,6 +66,7 @@ Route::middleware(['auth'])->group(function () {
     */
     Route::resource('characters', CharacterController::class);
     Route::resource('editors', EditorController::class);
+    Route::resource('trailers', TrailerController::class); // <-- Added Trailer Route
 
     /*
     |----------------------------------------------------------------------

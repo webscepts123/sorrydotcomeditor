@@ -39,6 +39,11 @@
             </a>        
         </li>
         <li>
+            <a href="{{ route('trailers.index') }}" class="nav-link {{ request()->routeIs('trailers.*') ? 'active bg-white text-black' : 'text-white' }} rounded-0 mb-4 tracking-widest small">
+                TRAILERS
+            </a>
+        </li>
+        <li>
             <a href="{{ route('soundtracks.index') }}" class="nav-link {{ request()->routeIs('soundtracks.*') ? 'active bg-white text-black' : 'text-white' }} rounded-0 mb-4 tracking-widest small">
                 SOUNDTRACKS
             </a>
