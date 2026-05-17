@@ -16,7 +16,11 @@ class Character extends Model
         'name',
         'ai_tag',
         'role',          // ADDED: From your new dropdown
-        'description',   // ADDED: From your textarea
+        'description', 
+        'personality',
+        'dialogue_style',
+        'prompt',
+        'image_path'  // ADDED: From your textarea
     ];
 
     /**

@@ -5,6 +5,7 @@ use App\Models\Scene;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use App\Models\Character;
+use Illuminate\Support\Facades\Http;
 
 class SceneController extends Controller
 {
@@ -136,5 +137,108 @@ class SceneController extends Controller
         // 4. Redirect back to the timeline with a status message
         return redirect()->route('projects.timeline', $projectId)
             ->with('success', 'SEQUENCE PURGED FROM TIMELINE.');
+    }
+
+    public function generateSceneVideo(Request $request)
+    {
+        set_time_limit(300);
+        ini_set('max_execution_time', '300');
+        ini_set('memory_limit', '512M');
+
+        $validated = $request->validate([
+            'project_id' => 'required|exists:projects,id',
+            'script_segment' => 'required|string',
+            'order_index' => 'nullable|integer',
+            'characters' => 'required|array',
+            'characters.*' => 'exists:characters,id',
+        ]);
+
+        $characters = Character::whereIn('id', $validated['characters'])->get();
+
+        if ($characters->isEmpty()) {
+            return back()->with('error', 'Please select at least one character.');
+        }
+
+        $castPrompt = '';
+
+        foreach ($characters as $character) {
+            $castPrompt .= "
+    CHARACTER NAME: {$character->name}
+    ROLE: {$character->role}
+    AI TAG: {$character->ai_tag}
+    CHARACTER PROMPT:
+    {$character->prompt}
+
+    IMAGE REFERENCE:
+    " . ($character->image_path ? asset('storage/' . $character->image_path) : 'No image reference') . "
+
+    ";
+        }
+
+        $scenePrompt = "
+    SEEDANCE 2.0 CINEMATIC SCENE GENERATION
+
+    SCENE ACTION:
+    {$validated['script_segment']}
+
+    CAST:
+    {$castPrompt}
+
+    VIDEO STYLE:
+    Ultra realistic live-action cinematic Sri Lankan movie scene.
+    Real human actors, natural motion, emotional acting, realistic faces, film-grade lighting, cinematic camera movement, 24fps movie look.
+
+    CAMERA DIRECTION:
+    Start with a cinematic establishing shot, then move into a dramatic close-up. Smooth camera motion, shallow depth of field, professional lens look.
+
+    STRICT RULES:
+    NO anime.
+    NO cartoon.
+    NO 3D render.
+    NO illustration.
+    NO stylized game character.
+    Real human live-action movie only.
+
+    OUTPUT:
+    5 to 8 second cinematic cutscene suitable for a movie trailer.
+    ";
+
+        try {
+            $response = Http::timeout(300)
+                ->connectTimeout(60)
+                ->post(env('SEEDANCE_BASE_URL') . '/text2video', [
+                    'key' => env('SEEDANCE_API_KEY'),
+                    'prompt' => $scenePrompt,
+                    'width' => 1024,
+                    'height' => 576,
+                    'duration' => 6,
+                    'guidance_scale' => 7.5,
+                ]);
+
+            if ($response->failed()) {
+                return back()->with('error', 'Seedance generation failed: ' . $response->body());
+            }
+
+            $data = $response->json();
+
+            $scene = Scene::create([
+                'project_id' => $validated['project_id'],
+                'order_index' => $validated['order_index'] ?? 1,
+                'script_segment' => $validated['script_segment'],
+                'prompt' => $scenePrompt,
+                'video_url' => $data['output'][0] ?? null,
+                'seedance_job_id' => $data['id'] ?? $data['job_id'] ?? null,
+                'status' => 'processing',
+            ]);
+
+            $scene->characters()->sync($validated['characters']);
+
+            return redirect()
+                ->route('scenes.show', $scene)
+                ->with('success', 'Seedance 2.0 scene generation started.');
+
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Seedance error: ' . $e->getMessage());
+        }
     }
 }

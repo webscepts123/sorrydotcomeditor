@@ -55,6 +55,9 @@ Route::middleware(['auth'])->group(function () {
     | Note: This single resource line handles create, store, edit, update, and destroy.
     */
     Route::resource('scenes', SceneController::class);
+
+    Route::post('/scenes/generate-video', [SceneController::class, 'generateSceneVideo'])
+    ->name('scenes.generate-video');
     
     // Specific Action: Trigger single AI generation via AJAX in the Editor
     Route::post('/scenes/{scene}/render', [SceneController::class, 'render'])->name('scenes.render');
@@ -65,6 +68,12 @@ Route::middleware(['auth'])->group(function () {
     |----------------------------------------------------------------------
     */
     Route::resource('characters', CharacterController::class);
+    Route::post('/characters/{character}/generate-image',
+    [CharacterController::class, 'generateImage'])
+    ->name('characters.generate-image');
+
+    Route::post('/characters/{character}/sync-face', [CharacterController::class, 'sendToSyncFace'])
+    ->name('characters.sync-face');
     Route::resource('editors', EditorController::class);
     Route::resource('trailers', TrailerController::class); // <-- Added Trailer Route
 
