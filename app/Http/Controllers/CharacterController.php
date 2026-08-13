@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Character;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
@@ -11,8 +12,10 @@ class CharacterController extends Controller
 {
     public function index()
     {
-        $characters = Character::latest()->get();
-        return view('characters.index', compact('characters'));
+        $characters = Character::with('project')->latest()->get();
+        $projects = Auth::user()->projects()->orderBy('title')->get();
+
+        return view('characters.index', compact('characters', 'projects'));
     }
 
     public function create()
@@ -48,8 +51,14 @@ class CharacterController extends Controller
 
     public function show(Character $character)
     {
-        $character->load('scenes');
-        return view('characters.show', compact('character'));
+        $character->load(['project', 'scenes']);
+        $projects = Auth::user()
+            ->projects()
+            ->whereKeyNot($character->project_id)
+            ->orderBy('title')
+            ->get();
+
+        return view('characters.show', compact('character', 'projects'));
     }
 
     public function edit(Character $character)
@@ -96,6 +105,36 @@ class CharacterController extends Controller
 
         return redirect()->route('characters.index')
             ->with('success', 'Character identity has been terminated.');
+    }
+
+    public function transfer(Request $request, Character $character)
+    {
+        $validated = $request->validate([
+            'project_id' => 'required|integer|exists:projects,id',
+        ]);
+
+        $targetProject = Auth::user()
+            ->projects()
+            ->whereKey($validated['project_id'])
+            ->firstOrFail();
+
+        if ((int) $character->project_id === (int) $targetProject->id) {
+            return back()->with('error', 'Character is already assigned to that project.');
+        }
+
+        $detachedSceneIds = $character->scenes()
+            ->where('scenes.project_id', '!=', $targetProject->id)
+            ->pluck('scenes.id');
+
+        if ($detachedSceneIds->isNotEmpty()) {
+            $character->scenes()->detach($detachedSceneIds);
+        }
+
+        $character->update([
+            'project_id' => $targetProject->id,
+        ]);
+
+        return back()->with('success', "Character transferred to {$targetProject->title}.");
     }
 
     public function generateImage(Character $character)

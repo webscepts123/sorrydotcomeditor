@@ -13,6 +13,7 @@ class Character extends Model
      * The attributes that are mass assignable.
      */
     protected $fillable = [
+        'project_id',
         'name',
         'ai_tag',
         'role',          // ADDED: From your new dropdown
@@ -20,8 +21,14 @@ class Character extends Model
         'personality',
         'dialogue_style',
         'prompt',
+        'video_prompt',
         'image_path'  // ADDED: From your textarea
     ];
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
 
     /**
      * The Scenes that this character appears in.

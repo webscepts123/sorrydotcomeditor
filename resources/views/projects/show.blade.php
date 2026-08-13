@@ -10,6 +10,7 @@
             </div>
             <div class="d-flex gap-2">
                 <a href="{{ route('projects.editor', $project) }}" class="btn btn-white bg-white text-black rounded-0 px-4 small fw-bold tracking-widest">OPEN AI EDITOR</a>
+                <a href="{{ route('projects.videoeditor', $project) }}" class="btn btn-outline-info rounded-0 px-4 small fw-bold tracking-widest">VIDEO EDITOR</a>
                 <a href="{{ route('projects.edit', $project) }}" class="btn btn-outline-secondary rounded-0 px-4 small tracking-widest">CONFIG</a>
             </div>
         </div>
@@ -30,6 +31,10 @@
             <a href="{{ route('projects.editor', $project) }}" class="btn btn-outline-light rounded-0 w-100 py-3 small tracking-widest uppercase">
                 ADD NEW SCENE +
             </a>
+
+            <a href="{{ route('projects.videoeditor', $project) }}" class="btn btn-outline-info rounded-0 w-100 py-3 small tracking-widest uppercase mt-3">
+                VIDEO EDITOR
+            </a>
         </div>
 
         <div class="col-md-9 ps-5">
@@ -44,7 +49,10 @@
                         <span class="text-secondary small me-3">#{{ str_pad($scene->order_index, 3, '0', STR_PAD_LEFT) }}</span>
                         <span class="text-white">{{ Str::limit($scene->script_segment, 80) }}</span>
                     </div>
-                    <a href="{{ route('projects.editor', $project) }}" class="text-info small text-decoration-none">EDIT CLIP</a>
+                    <div class="d-flex gap-3">
+                        <a href="{{ route('projects.editor', $project) }}" class="text-info small text-decoration-none">EDIT CLIP</a>
+                        <a href="{{ route('projects.videoeditor', $project) }}?active_scene={{ $scene->id }}" class="text-secondary small text-decoration-none border-bottom border-secondary">VIDEO EDITOR</a>
+                    </div>
                 </div>
             @empty
                 <div class="py-5 text-center border border-dashed border-secondary">

@@ -21,6 +21,12 @@
         </div>
     @endif
 
+    @if(session('error'))
+        <div class="alert alert-danger bg-black border border-danger text-danger rounded-0 mb-4">
+            {{ session('error') }}
+        </div>
+    @endif
+
     <div class="row g-4">
         @forelse($characters as $character)
             <div class="col-md-3">
@@ -49,6 +55,15 @@
                         <div class="mb-2">
                             <span class="badge bg-dark border border-secondary text-white rounded-0 small tracking-widest uppercase">
                                 {{ $character->role ?? 'Protagonist' }}
+                            </span>
+                        </div>
+
+                        <div class="mb-3">
+                            <small class="text-secondary tracking-widest uppercase d-block mb-1" style="font-size: 9px;">
+                                Project
+                            </small>
+                            <span class="text-white small">
+                                {{ $character->project->title ?? 'Unassigned' }}
                             </span>
                         </div>
 
@@ -88,6 +103,30 @@
                                 <i class="bi bi-image me-1"></i> No Image
                             </button>
                         @endif
+
+                        <form action="{{ route('characters.transfer', $character) }}" method="POST" class="mt-2">
+                            @csrf
+
+                            <div class="input-group input-group-sm transfer-control">
+                                <select name="project_id"
+                                        class="form-select bg-black border-info text-white rounded-0 small tracking-widest uppercase"
+                                        required>
+                                    <option value="">Move to project</option>
+                                    @foreach($projects as $project)
+                                        <option value="{{ $project->id }}"
+                                            {{ $character->project_id == $project->id ? 'disabled' : '' }}>
+                                            {{ $project->title }}
+                                        </option>
+                                    @endforeach
+                                </select>
+
+                                <button type="submit"
+                                        class="btn btn-outline-info rounded-0 small tracking-widest uppercase"
+                                        title="Transfer character to selected project">
+                                    <i class="bi bi-arrow-left-right"></i>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -140,9 +179,27 @@
     }
 
     .btn-outline-info,
-    .btn-outline-secondary {
+    .btn-outline-secondary,
+    .transfer-control .form-select {
         font-size: 10px;
         letter-spacing: 0.12em;
+    }
+
+    .transfer-control .form-select:focus {
+        background-color: #000;
+        border-color: #0dcaf0;
+        box-shadow: none;
+        color: #fff;
+    }
+
+    .transfer-control option {
+        background: #000;
+        color: #fff;
+    }
+
+    .transfer-control .btn {
+        width: auto;
+        margin-top: 0;
     }
 
     @media (max-width: 768px) {

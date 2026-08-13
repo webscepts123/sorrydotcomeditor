@@ -6,6 +6,15 @@
     </a>
     <hr class="border-secondary">
     
+    @php
+        $routeName = request()->route()?->getName();
+        $currentProject = request()->route('project');
+        $activeSidebarProject = $currentProject instanceof \App\Models\Project
+            ? $currentProject
+            : \App\Models\Project::latest('updated_at')->first();
+        $projectsActiveRoutes = ['projects.index', 'projects.create', 'projects.show', 'projects.edit'];
+    @endphp
+
     <ul class="nav nav-pills flex-column mb-auto">
         <li class="nav-item">
             <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active bg-white text-black' : 'text-white' }} rounded-0 mb-2 tracking-widest small">
@@ -13,14 +22,18 @@
             </a>
         </li>
         <li>
-            <a href="{{ route('projects.index') }}" class="nav-link {{ request()->routeIs('projects.*') ? 'active bg-white text-black' : 'text-white' }} rounded-0 mb-2 tracking-widest small">
+            <a href="{{ route('projects.index') }}" class="nav-link {{ in_array($routeName, $projectsActiveRoutes, true) ? 'active bg-white text-black' : 'text-white' }} rounded-0 mb-2 tracking-widest small">
                 PROJECTS
             </a>
         </li>
         <li>
-            @php $activeSidebarProject = \App\Models\Project::latest('updated_at')->first(); @endphp
             <a href="{{ $activeSidebarProject ? route('projects.timeline', $activeSidebarProject->id) : route('projects.index') }}" class="nav-link {{ request()->routeIs('projects.timeline') ? 'active bg-white text-black' : 'text-white' }} rounded-0 mb-2 tracking-widest small">
                 TIMELINE
+            </a>
+        </li>
+        <li>
+            <a href="{{ route('planning.index') }}" class="nav-link {{ request()->routeIs('planning.*') ? 'active bg-white text-black' : 'text-white' }} rounded-0 mb-2 tracking-widest small">
+                STORY PLANNER
             </a>
         </li>
         <li>
@@ -58,6 +71,7 @@
             <div class="collapse" id="productionTools">
                 <ul class="btn-toggle-nav list-unstyled fw-normal pb-2 small ms-3 border-start border-secondary ps-3 mt-2">
                     <li><a href="{{ route('scenes.create') }}" class="text-secondary text-decoration-none rounded-0 py-2 d-block tool-hover tracking-widest" style="font-size: 10px;">NEW SHOT</a></li>
+                    <li><a href="{{ route('planning.index') }}" class="text-secondary text-decoration-none rounded-0 py-2 d-block tool-hover tracking-widest" style="font-size: 10px;">STORY PLANNER</a></li>
                     <li><a href="{{ route('tools.sync-face') }}" class="text-secondary text-decoration-none rounded-0 py-2 d-block tool-hover tracking-widest" style="font-size: 10px;">SYNC FACE</a></li>
                     <li><a href="{{ route('tools.gen-score') }}" class="text-secondary text-decoration-none rounded-0 py-2 d-block tool-hover tracking-widest" style="font-size: 10px;">GEN SCORE</a></li>
                     <li><a href="{{ route('tools.script') }}" class="text-secondary text-decoration-none rounded-0 py-2 d-block tool-hover tracking-widest" style="font-size: 10px;">SCRIPT</a></li>
@@ -89,4 +103,3 @@
         </ul>
     </div>
 </div>
-

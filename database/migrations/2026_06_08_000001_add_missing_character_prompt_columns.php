@@ -12,22 +12,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('characters', function (Blueprint $table) {
-            if (!Schema::hasColumn('characters', 'image_path')) {
-                $table->string('image_path')->nullable()->after('reference_image');
-            }
-
-            if (!Schema::hasColumn('characters', 'personality')) {
-                $table->text('personality')->nullable()->after('description');
-            }
-
-            if (!Schema::hasColumn('characters', 'dialogue_style')) {
-                $table->text('dialogue_style')->nullable()->after('personality');
-            }
-
-            if (!Schema::hasColumn('characters', 'prompt')) {
-                $table->text('prompt')->nullable()->after('dialogue_style');
-            }
-
             if (!Schema::hasColumn('characters', 'video_prompt')) {
                 $table->text('video_prompt')->nullable()->after('prompt');
             }
@@ -44,6 +28,10 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('characters', function (Blueprint $table) {
+            if (Schema::hasColumn('characters', 'video_prompt')) {
+                $table->dropColumn('video_prompt');
+            }
+
             if (Schema::hasColumn('characters', 'sync_face_status')) {
                 $table->dropColumn('sync_face_status');
             }

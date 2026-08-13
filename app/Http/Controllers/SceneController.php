@@ -6,6 +6,7 @@ use App\Models\Project;
 use Illuminate\Http\Request;
 use App\Models\Character;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 class SceneController extends Controller
 {
@@ -29,6 +30,14 @@ class SceneController extends Controller
         return view('scenes.create', compact('projects', 'characters'));
     }
 
+    public function show(Scene $scene)
+    {
+        return redirect()->route('projects.videoeditor', [
+            'project' => $scene->project_id,
+            'active_scene' => $scene->id,
+        ]);
+    }
+
     /**
      * Trigger the AI generation process (Regenerate Seed).
      */
@@ -42,6 +51,31 @@ class SceneController extends Controller
 
         // 3. Redirect back to the timeline or editor with a status message
         return back()->with('success', 'AI ENGINE ENGAGED. RE-RENDERING SEQUENCE ID: ' . $scene->id);
+    }
+
+    public function attachVideo(Request $request, Scene $scene)
+    {
+        $validated = $request->validate([
+            'video_file' => 'required|file|mimes:mp4,mov,webm,m4v|max:512000',
+        ]);
+
+        if ($scene->video_path && Storage::disk('public')->exists($scene->video_path)) {
+            Storage::disk('public')->delete($scene->video_path);
+        }
+
+        $path = $validated['video_file']->store('scenes', 'public');
+
+        $scene->update([
+            'video_path' => $path,
+            'status' => 'Ready',
+        ]);
+
+        return redirect()
+            ->route('projects.videoeditor', [
+                'project' => $scene->project_id,
+                'active_scene' => $scene->id,
+            ])
+            ->with('success', 'Video attached to sequence.');
     }
     /**
      * Show the form for editing the scene script and sequence.
@@ -75,10 +109,21 @@ class SceneController extends Controller
         $scene->update($validated);
 
         // Sync the characters (this adds new ones and removes unselected ones)
-        if ($request->has('characters')) {
+        if ($request->boolean('preserve_characters')) {
+            // The video editor updates scene metadata without showing cast controls.
+        } elseif ($request->has('characters')) {
             $scene->characters()->sync($validated['characters']);
         } else {
             $scene->characters()->detach();
+        }
+
+        if ($request->boolean('return_to_videoeditor')) {
+            return redirect()
+                ->route('projects.videoeditor', [
+                    'project' => $scene->project_id,
+                    'active_scene' => $scene->id,
+                ])
+                ->with('success', 'SEQUENCE UPDATED SUCCESSFULLY.');
         }
 
         return redirect()->route('projects.timeline', $scene->project_id)
@@ -228,7 +273,7 @@ class SceneController extends Controller
                 'prompt' => $scenePrompt,
                 'video_url' => $data['output'][0] ?? null,
                 'seedance_job_id' => $data['id'] ?? $data['job_id'] ?? null,
-                'status' => 'processing',
+                'status' => 'Processing',
             ]);
 
             $scene->characters()->sync($validated['characters']);

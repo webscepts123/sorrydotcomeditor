@@ -25,6 +25,15 @@
                     @if($activeProject)
                         <h3 class="fw-bold mb-1 text-uppercase">{{ $activeProject->title }}</h3>
                         <p class="text-secondary small mb-4">Style: {{ strtoupper($activeProject->style_preset ?? 'Unassigned') }}</p>
+
+                        <div class="d-grid gap-2 mb-4">
+                            <a href="{{ route('projects.videoeditor', $activeProject) }}" class="btn btn-outline-info rounded-0 py-2 small tracking-widest text-decoration-none">
+                                <i class="bi bi-film me-2"></i> OPEN VIDEO EDITOR
+                            </a>
+                            <a href="{{ route('projects.editor', $activeProject) }}" class="btn btn-outline-light rounded-0 py-2 small tracking-widest text-decoration-none">
+                                <i class="bi bi-camera-reels me-2"></i> OPEN AI EDITOR
+                            </a>
+                        </div>
                         
                         <div class="mt-auto">
                             <div class="d-flex justify-content-between mb-1 small">
@@ -108,6 +117,17 @@
                             <a href="{{ route('scenes.create') }}" class="btn btn-outline-light w-100 rounded-0 py-3 small text-decoration-none">
                                 <i class="bi bi-camera-reels d-block mb-2 fs-4"></i> NEW SHOT
                             </a>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            @if($activeProject)
+                                <a href="{{ route('projects.videoeditor', $activeProject) }}" class="btn btn-outline-info w-100 rounded-0 py-3 small text-decoration-none">
+                                    <i class="bi bi-film d-block mb-2 fs-4"></i> VIDEO EDITOR
+                                </a>
+                            @else
+                                <button type="button" class="btn btn-outline-secondary w-100 rounded-0 py-3 small" disabled>
+                                    <i class="bi bi-film d-block mb-2 fs-4"></i> VIDEO EDITOR
+                                </button>
+                            @endif
                         </div>
                         <div class="col-6 col-md-3">
                             <a href="{{ route('tools.sync-face') }}" class="btn btn-outline-light w-100 rounded-0 py-3 small text-decoration-none">

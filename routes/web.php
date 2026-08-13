@@ -9,6 +9,7 @@ use App\Http\Controllers\CharacterController;
 use App\Http\Controllers\EditorController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SoundtrackController;
+use App\Http\Controllers\ProductionPlanController;
 use App\Http\Controllers\TrailerController; // <-- Added TrailerController
 
 /*
@@ -46,6 +47,7 @@ Route::middleware(['auth'])->group(function () {
         // Orchestration & Rendering Commands
         Route::post('/render-batch', [ProjectController::class, 'renderBatch'])->name('projects.render-batch');
         Route::get('/export-xml', [ProjectController::class, 'exportXml'])->name('projects.export-xml');
+        Route::get('/download-video/{quality}', [ProjectController::class, 'downloadVideo'])->name('projects.download-video');
     });
 
     /*
@@ -61,6 +63,7 @@ Route::middleware(['auth'])->group(function () {
     
     // Specific Action: Trigger single AI generation via AJAX in the Editor
     Route::post('/scenes/{scene}/render', [SceneController::class, 'render'])->name('scenes.render');
+    Route::post('/scenes/{scene}/attach-video', [SceneController::class, 'attachVideo'])->name('scenes.attach-video');
 
     /*
     |----------------------------------------------------------------------
@@ -68,6 +71,9 @@ Route::middleware(['auth'])->group(function () {
     |----------------------------------------------------------------------
     */
     Route::resource('characters', CharacterController::class);
+    Route::post('/characters/{character}/transfer', [CharacterController::class, 'transfer'])
+    ->name('characters.transfer');
+
     Route::post('/characters/{character}/generate-image',
     [CharacterController::class, 'generateImage'])
     ->name('characters.generate-image');
@@ -93,12 +99,17 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/settings', 'index')->name('settings');
         Route::post('/settings/update', 'update')->name('settings.update');
         Route::post('/settings/api-refresh', 'refreshApiKey')->name('settings.api-refresh');
+        Route::post('/settings/cache-clear', 'clearCache')->name('settings.cache-clear');
     });
+
+    Route::get('/planning', [ProductionPlanController::class, 'index'])->name('planning.index');
+    Route::post('/planning', [ProductionPlanController::class, 'update'])->name('planning.update');
 
     Route::prefix('tools')->name('tools.')->group(function () {
         Route::get('/sync-face', [App\Http\Controllers\ToolController::class, 'syncFace'])->name('sync-face');
         Route::get('/gen-score', [App\Http\Controllers\ToolController::class, 'genScore'])->name('gen-score');
         Route::get('/script', [App\Http\Controllers\ToolController::class, 'script'])->name('script');
+        Route::post('/script/parse', [App\Http\Controllers\ToolController::class, 'parseScript'])->name('script.parse');
     });
 
 });

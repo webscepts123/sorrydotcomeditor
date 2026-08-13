@@ -84,41 +84,73 @@
                 </div>
             </div>
 
-            <form action="{{ route('characters.generate-image', $character) }}" method="POST">
-                @csrf
-                <button type="submit"
-                    class="btn btn-outline-warning w-100 rounded-0 py-3 small uppercase tracking-widest transition-hover mb-2">
-                    <i class="bi bi-magic me-2"></i> GENERATE REAL CHARACTER
-                </button>
-            </form>
+            <div class="character-actions">
+                <form action="{{ route('characters.generate-image', $character) }}" method="POST" class="js-action-form">
+                    @csrf
+                    <button type="submit"
+                            class="action-btn action-warning"
+                            {{ $character->prompt ? '' : 'disabled' }}
+                            title="{{ $character->prompt ? 'Generate character reference image' : 'Add an AI prompt before generating an image' }}">
+                        <i class="bi bi-magic"></i>
+                        <span>{{ $hasImage ? 'Regenerate Character' : 'Generate Real Character' }}</span>
+                    </button>
+                </form>
 
-            @if($hasImage)
-                <a href="{{ $imageUrl }}"
-                   download="{{ Str::slug($character->name) }}-character.png"
-                   class="btn btn-outline-success w-100 rounded-0 py-3 small uppercase tracking-widest transition-hover mb-2">
-                    <i class="bi bi-download me-2"></i> DOWNLOAD IMAGE
-                </a>
-            @else
-                <button type="button"
-                    class="btn btn-outline-secondary w-100 rounded-0 py-3 small uppercase tracking-widest mb-2"
-                    disabled>
-                    <i class="bi bi-image me-2"></i> NO IMAGE TO DOWNLOAD
-                </button>
-            @endif
-            <form action="{{ route('characters.sync-face', $character) }}" method="POST">
-                @csrf
-                <button type="submit" class="btn btn-outline-info w-100 rounded-0 py-3 small uppercase tracking-widest transition-hover mb-2">
-                    <i class="bi bi-person-bounding-box me-2"></i> SEND TO SYNC FACE
-                </button>
-            </form>
+                @if($hasImage)
+                    <a href="{{ $imageUrl }}"
+                       download="{{ Str::slug($character->name) }}-character.png"
+                       class="action-btn action-success">
+                        <i class="bi bi-download"></i>
+                        <span>Download Image</span>
+                    </a>
+                @else
+                    <button type="button" class="action-btn action-muted" disabled>
+                        <i class="bi bi-image"></i>
+                        <span>No Image To Download</span>
+                    </button>
+                @endif
 
-            <form action="{{ route('characters.destroy', $character) }}" method="POST" onsubmit="return confirm('CRITICAL: Purge this character identity?');">
-                @csrf
-                @method('DELETE')
-                <button type="submit" class="btn btn-outline-danger w-100 rounded-0 py-3 small uppercase tracking-widest transition-hover">
-                    <i class="bi bi-trash3 me-2"></i> TERMINATE IDENTITY
-                </button>
-            </form>
+                <form action="{{ route('characters.sync-face', $character) }}" method="POST" class="js-action-form">
+                    @csrf
+                    <button type="submit"
+                            class="action-btn action-info"
+                            {{ $hasImage ? '' : 'disabled' }}
+                            title="{{ $hasImage ? 'Prepare this character for Sync Face' : 'Generate or upload an image before sending to Sync Face' }}">
+                        <i class="bi bi-person-bounding-box"></i>
+                        <span>Send To Sync Face</span>
+                    </button>
+                </form>
+
+                @if($projects->isNotEmpty())
+                    <form action="{{ route('characters.transfer', $character) }}" method="POST" class="transfer-form">
+                        @csrf
+                        <select name="project_id" class="form-select action-select" required>
+                            <option value="">Move to project</option>
+                            @foreach($projects as $project)
+                                <option value="{{ $project->id }}">{{ $project->title }}</option>
+                            @endforeach
+                        </select>
+
+                        <button type="submit" class="action-icon-btn action-info" title="Transfer character">
+                            <i class="bi bi-arrow-left-right"></i>
+                        </button>
+                    </form>
+                @else
+                    <button type="button" class="action-btn action-muted" disabled>
+                        <i class="bi bi-arrow-left-right"></i>
+                        <span>No Other Project</span>
+                    </button>
+                @endif
+
+                <form action="{{ route('characters.destroy', $character) }}" method="POST" onsubmit="return confirm('CRITICAL: Purge this character identity?');">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="action-btn action-danger">
+                        <i class="bi bi-trash3"></i>
+                        <span>Terminate Identity</span>
+                    </button>
+                </form>
+            </div>
         </div>
 
         <div class="col-md-8">
@@ -190,6 +222,106 @@
     .object-fit-cover { object-fit: cover; }
     .border-dashed { border-style: dashed !important; }
 
+    .character-actions {
+        display: grid;
+        gap: 10px;
+    }
+
+    .character-actions form {
+        margin: 0;
+    }
+
+    .action-btn,
+    .action-icon-btn {
+        align-items: center;
+        background: #000;
+        border: 1px solid currentColor;
+        border-radius: 0;
+        color: #fff;
+        display: flex;
+        font-size: 11px;
+        font-weight: 700;
+        gap: 14px;
+        justify-content: center;
+        letter-spacing: 0.2em;
+        min-height: 58px;
+        padding: 14px 18px;
+        text-decoration: none;
+        text-transform: uppercase;
+        transition: all 0.2s ease;
+        width: 100%;
+    }
+
+    .action-btn i {
+        flex: 0 0 20px;
+        font-size: 16px;
+        text-align: center;
+    }
+
+    .action-btn span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .action-btn:not(:disabled):hover,
+    .action-icon-btn:not(:disabled):hover {
+        background: #111;
+        border-color: #fff;
+        color: #fff;
+        transform: translateY(-2px);
+    }
+
+    .action-btn:disabled,
+    .action-icon-btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+        transform: none;
+    }
+
+    .action-warning { color: #ffc107; }
+    .action-success { color: #00d47e; }
+    .action-info { color: #00d9ff; }
+    .action-danger { color: #ff1744; }
+    .action-muted { color: #6c757d; }
+
+    .transfer-form {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 58px;
+        gap: 10px;
+    }
+
+    .action-select {
+        background-color: #000;
+        border: 1px solid #00d9ff;
+        border-radius: 0;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        min-height: 58px;
+        text-transform: uppercase;
+    }
+
+    .action-select:focus {
+        background-color: #000;
+        border-color: #fff;
+        box-shadow: none;
+        color: #fff;
+    }
+
+    .action-select option {
+        background: #000;
+        color: #fff;
+    }
+
+    .action-icon-btn {
+        padding: 0;
+    }
+
+    .action-icon-btn i {
+        font-size: 16px;
+    }
+
     .transition-hover {
         transition: all 0.2s ease;
     }
@@ -220,6 +352,24 @@
         .bg-black.border.border-secondary.p-5 {
             padding: 25px !important;
         }
+
+        .action-btn {
+            justify-content: center;
+            min-height: 54px;
+        }
     }
 </style>
+
+<script>
+document.querySelectorAll('.js-action-form').forEach((form) => {
+    form.addEventListener('submit', () => {
+        const button = form.querySelector('button[type="submit"]');
+        if (!button || button.disabled) return;
+
+        button.dataset.originalText = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-hourglass-split"></i><span>Processing</span>';
+        button.disabled = true;
+    });
+});
+</script>
 @endsection

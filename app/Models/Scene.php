@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Scene extends Model
 {
-    protected $fillable = ['project_id', 'order_index', 'script_segment', 'status'];
+    protected $fillable = ['project_id', 'order_index', 'script_segment', 'video_path', 'status'];
 
     public function project(): BelongsTo
     {

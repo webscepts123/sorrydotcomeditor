@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Project extends Model
@@ -21,6 +22,10 @@ class Project extends Model
     // Get the sequence of scenes (the 150-minute timeline)
     public function scenes(): HasMany {
         return $this->hasMany(Scene::class)->orderBy('order_index');
+    }
+
+    public function productionPlan(): HasOne {
+        return $this->hasOne(ProductionPlan::class);
     }
 
     // Get all audio/music tracks

@@ -36,6 +36,9 @@
                             <a href="{{ route('projects.show', $project) }}" class="text-white text-decoration-none small tracking-widest border-bottom border-white pb-1 hover-gray">
                                 VIEW DATA
                             </a>
+                            <a href="{{ route('projects.videoeditor', $project) }}" class="text-info text-decoration-none small tracking-widest border-bottom border-info pb-1 hover-white">
+                                VIDEO
+                            </a>
                             <a href="{{ route('projects.edit', $project) }}" class="text-secondary text-decoration-none small tracking-widest border-bottom border-secondary pb-1 hover-white">
                                 EDIT
                             </a>

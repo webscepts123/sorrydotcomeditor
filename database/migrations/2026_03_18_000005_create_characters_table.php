@@ -18,7 +18,12 @@ return new class extends Migration
             $table->string('ai_tag')->nullable();
             $table->string('role')->nullable();
             $table->string('reference_image')->nullable();
+            $table->string('image_path')->nullable();
             $table->text('description')->nullable();
+            $table->text('personality')->nullable();
+            $table->text('dialogue_style')->nullable();
+            $table->text('prompt')->nullable();
+            $table->text('video_prompt')->nullable();
             $table->timestamps();
         });
     }
