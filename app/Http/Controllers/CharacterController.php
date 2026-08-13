@@ -10,6 +10,63 @@ use Illuminate\Support\Facades\Storage;
 
 class CharacterController extends Controller
 {
+    public function generateDetails(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'role' => 'required|string|in:protagonist,antagonist,supporting,mentor,comic_relief,love_interest,anti_hero',
+        ]);
+
+        $apiKey = env('OPENAI_API_KEY');
+
+        if (!$apiKey) {
+            return response()->json([
+                'message' => 'Add your OpenAI API key in Settings before using AI generation.',
+            ], 422);
+        }
+
+        try {
+            $response = Http::withToken($apiKey)
+                ->timeout(60)
+                ->post('https://api.openai.com/v1/chat/completions', [
+                    'model' => 'gpt-4.1-mini',
+                    'response_format' => ['type' => 'json_object'],
+                    'messages' => [
+                        [
+                            'role' => 'system',
+                            'content' => 'You are a professional cinematic character designer. Return only valid JSON with exactly these string keys: description, personality, dialogue_style. Make each value vivid, specific, production-ready, and concise (2-3 sentences). Do not use markdown.',
+                        ],
+                        [
+                            'role' => 'user',
+                            'content' => "Create character details for {$validated['name']}, whose role/archetype is {$validated['role']}.",
+                        ],
+                    ],
+                ]);
+
+            if ($response->failed()) {
+                return response()->json([
+                    'message' => $response->json('error.message') ?: 'OpenAI could not generate character details.',
+                ], $response->status() >= 400 && $response->status() < 500 ? 422 : 502);
+            }
+
+            $details = json_decode($response->json('choices.0.message.content', ''), true);
+
+            if (!is_array($details) || !isset($details['description'], $details['personality'], $details['dialogue_style'])) {
+                return response()->json(['message' => 'OpenAI returned an invalid response. Please try again.'], 502);
+            }
+
+            return response()->json([
+                'description' => (string) $details['description'],
+                'personality' => (string) $details['personality'],
+                'dialogue_style' => (string) $details['dialogue_style'],
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json(['message' => 'AI generation failed. Please try again.'], 500);
+        }
+    }
+
     public function index()
     {
         $characters = Character::with('project')->latest()->get();
@@ -21,12 +78,14 @@ class CharacterController extends Controller
     public function create()
     {
         $characters = Character::latest()->get();
-        return view('characters.create', compact('characters'));
+        $projects = Auth::user()->projects()->orderBy('title')->get();
+        return view('characters.create', compact('characters', 'projects'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'project_id' => 'required|integer',
             'name' => 'required|string|max:255',
             'ai_tag' => 'nullable|string|max:100',
             'role' => 'required|string|max:100',
@@ -36,6 +95,8 @@ class CharacterController extends Controller
             'prompt' => 'nullable|string',
             'reference_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
+
+        Auth::user()->projects()->findOrFail($validated['project_id']);
 
         unset($validated['reference_image']);
 
@@ -63,12 +124,14 @@ class CharacterController extends Controller
 
     public function edit(Character $character)
     {
-        return view('characters.edit', compact('character'));
+        $projects = Auth::user()->projects()->orderBy('title')->get();
+        return view('characters.edit', compact('character', 'projects'));
     }
 
     public function update(Request $request, Character $character)
     {
         $validated = $request->validate([
+            'project_id' => 'required|integer',
             'name' => 'required|string|max:255',
             'ai_tag' => 'nullable|string|max:100',
             'role' => 'required|string|max:100',
@@ -78,6 +141,8 @@ class CharacterController extends Controller
             'prompt' => 'nullable|string',
             'reference_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
+
+        Auth::user()->projects()->findOrFail($validated['project_id']);
 
         unset($validated['reference_image']);
 

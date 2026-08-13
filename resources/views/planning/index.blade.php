@@ -63,26 +63,32 @@
                 <div class="row g-4">
                     <div class="col-xl-7">
                         <div class="bg-black border border-secondary p-4 h-100">
-                            <h5 class="text-white small tracking-widest uppercase mb-4 border-bottom border-secondary pb-2">Full Story & Script Plan</h5>
+                            <div class="d-flex justify-content-between align-items-center gap-3 mb-4 border-bottom border-secondary pb-2">
+                                <h5 class="text-white small tracking-widest uppercase mb-0">Full Story & Script Plan</h5>
+                                <button id="generate-story-button" type="button" class="btn btn-outline-info btn-sm rounded-0 tracking-widest uppercase" onclick="generateStoryContent()">
+                                    Generate with AI
+                                </button>
+                            </div>
+                            <div id="generate-story-status" class="text-secondary small mb-3" aria-live="polite"></div>
 
                             <div class="mb-4">
                                 <label class="form-label text-secondary small tracking-widest uppercase">Logline</label>
-                                <input type="text" name="logline" value="{{ old('logline', $plan->logline) }}" class="form-control bg-transparent border-0 border-bottom border-secondary rounded-0 text-white p-2" placeholder="One sentence that defines the movie.">
+                                <input id="logline" type="text" name="logline" value="{{ old('logline', $plan->logline) }}" class="form-control bg-transparent border-0 border-bottom border-secondary rounded-0 text-white p-2" placeholder="One sentence that defines the movie.">
                             </div>
 
                             <div class="mb-4">
                                 <label class="form-label text-secondary small tracking-widest uppercase">Full Story Script</label>
-                                <textarea name="full_story" rows="12" class="form-control bg-transparent border border-secondary rounded-0 text-white p-3 font-monospace" placeholder="Write the complete story, plot, characters, turns, ending, and emotional arc here.">{{ old('full_story', $plan->full_story) }}</textarea>
+                                <textarea id="full_story" name="full_story" rows="12" class="form-control bg-transparent border border-secondary rounded-0 text-white p-3 font-monospace" placeholder="Write the complete story, plot, characters, turns, ending, and emotional arc here.">{{ old('full_story', $plan->full_story) }}</textarea>
                             </div>
 
                             <div class="mb-4">
                                 <label class="form-label text-secondary small tracking-widest uppercase">Script Outline / Acts</label>
-                                <textarea name="script_outline" rows="8" class="form-control bg-transparent border border-secondary rounded-0 text-white p-3 font-monospace" placeholder="Act 1, Act 2, Act 3, turning points, midpoint, climax...">{{ old('script_outline', $plan->script_outline) }}</textarea>
+                                <textarea id="script_outline" name="script_outline" rows="8" class="form-control bg-transparent border border-secondary rounded-0 text-white p-3 font-monospace" placeholder="Act 1, Act 2, Act 3, turning points, midpoint, climax...">{{ old('script_outline', $plan->script_outline) }}</textarea>
                             </div>
 
                             <div>
                                 <label class="form-label text-secondary small tracking-widest uppercase">Scene Breakdown</label>
-                                <textarea name="scene_breakdown" rows="8" class="form-control bg-transparent border border-secondary rounded-0 text-white p-3 font-monospace" placeholder="Scene 001: location, cast, action, required props, render notes...">{{ old('scene_breakdown', $plan->scene_breakdown) }}</textarea>
+                                <textarea id="scene_breakdown" name="scene_breakdown" rows="8" class="form-control bg-transparent border border-secondary rounded-0 text-white p-3 font-monospace" placeholder="Scene 001: location, cast, action, required props, render notes...">{{ old('scene_breakdown', $plan->scene_breakdown) }}</textarea>
                             </div>
                         </div>
                     </div>
@@ -147,4 +153,47 @@
     .form-select option { background: #000; color: #fff; }
     .btn-white:hover { background: #ddd !important; }
 </style>
+
+@if($project && $plan)
+<script>
+async function generateStoryContent() {
+    const button = document.getElementById('generate-story-button');
+    const status = document.getElementById('generate-story-status');
+
+    if (!confirm('Generate and replace the logline, story, outline, and scene breakdown fields?')) return;
+
+    button.disabled = true;
+    button.textContent = 'GENERATING...';
+    status.textContent = 'AI is writing the story plan. This may take a minute...';
+
+    try {
+        const response = await fetch(@json(route('planning.generate-story')), {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': @json(csrf_token()),
+            },
+            body: JSON.stringify({
+                project_id: @json($project->id),
+                logline: document.getElementById('logline').value,
+            }),
+        });
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.message || 'Story generation failed.');
+
+        ['logline', 'full_story', 'script_outline', 'scene_breakdown'].forEach((field) => {
+            document.getElementById(field).value = data[field];
+        });
+        status.textContent = 'Story content generated. Review it, then click Save Planning.';
+    } catch (error) {
+        status.textContent = error.message;
+    } finally {
+        button.disabled = false;
+        button.textContent = 'GENERATE WITH AI';
+    }
+}
+</script>
+@endif
 @endsection

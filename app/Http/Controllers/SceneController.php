@@ -7,31 +7,39 @@ use Illuminate\Http\Request;
 use App\Models\Character;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
+use App\Services\ComfyVideoService;
 
 class SceneController extends Controller
 {
     public function index()
     {
-        // Fetch scenes ordered by their position in the movie timeline
         $scenes = Scene::with('project')
+            ->withCount('videoClips')
+            ->whereHas('project', fn ($query) => $query->where('user_id', Auth::id()))
             ->orderBy('project_id')
             ->orderBy('order_index')
-            ->paginate(15); // Pagination is vital for a 2.5-hour movie
+            ->paginate(15);
 
         return view('scenes.index', compact('scenes'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        $projects = Project::latest()->get();
-        // Updated to get characters for the selection sidebar
-        $characters = Character::orderBy('name')->get();
+        $projects = Auth::user()->projects()->latest()->get();
+        $selectedProjectId = (int) ($request->query('project') ?: $projects->first()?->id);
+        $projectIds = $projects->pluck('id');
+        $characters = Character::where(function ($query) use ($projectIds) {
+            $query->whereIn('project_id', $projectIds)->orWhereNull('project_id');
+        })->orderBy('name')->get();
         
-        return view('scenes.create', compact('projects', 'characters'));
+        return view('scenes.create', compact('projects', 'characters', 'selectedProjectId'));
     }
 
     public function show(Scene $scene)
     {
+        $this->ensureSceneOwnership($scene);
+
         return redirect()->route('projects.videoeditor', [
             'project' => $scene->project_id,
             'active_scene' => $scene->id,
@@ -41,16 +49,52 @@ class SceneController extends Controller
     /**
      * Trigger the AI generation process (Regenerate Seed).
      */
-    public function render(Scene $scene)
+    public function render(Scene $scene, ComfyVideoService $comfy)
     {
-        // 1. Update the status so the UI knows it's working
-        $scene->update(['status' => 'Processing']);
+        $this->ensureSceneOwnership($scene);
 
-        // 2. [Future Implementation] Dispatch a Job to your Seedance API
-        // \App\Jobs\GenerateSceneVideo::dispatch($scene);
+        $scene->load('characters');
+        $cast = $scene->characters->map(fn ($character) => implode("\n", array_filter([
+            "Character: {$character->name} ({$character->role})",
+            $character->description,
+            $character->personality,
+        ])))->implode("\n\n");
 
-        // 3. Redirect back to the timeline or editor with a status message
-        return back()->with('success', 'AI ENGINE ENGAGED. RE-RENDERING SEQUENCE ID: ' . $scene->id);
+        $prompt = implode("\n\n", array_filter([
+            'Create a photorealistic live-action cinematic cutscene. Real human actors, natural movement, film lighting, coherent motion, professional camera work, 24fps movie aesthetic.',
+            "Scene action: {$scene->script_segment}",
+            $cast ? "Cast continuity:\n{$cast}" : null,
+            'No animation, cartoons, illustrations, game graphics, subtitles, logos, or watermarks.',
+        ]));
+
+        try {
+            $jobId = $comfy->submit($prompt);
+            $scene->update(['status' => 'Processing', 'generation_job_id' => $jobId, 'generation_error' => null]);
+            return back()->with('success', 'Local Wan/ComfyUI generation queued. Use Check Render Status to import the finished video.');
+        } catch (\Throwable $e) {
+            $scene->update(['status' => 'failed', 'generation_error' => $e->getMessage()]);
+            return back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function syncRender(Scene $scene, ComfyVideoService $comfy)
+    {
+        $this->ensureSceneOwnership($scene);
+        if (!$scene->generation_job_id) return back()->with('error', 'This scene has no local generation job.');
+
+        try {
+            $path = $comfy->downloadCompletedVideo($scene->generation_job_id);
+            if (!$path) return back()->with('error', 'The local video is still generating. Try again shortly.');
+
+            if ($scene->video_path && Storage::disk('public')->exists($scene->video_path)) {
+                Storage::disk('public')->delete($scene->video_path);
+            }
+            $scene->update(['video_path' => $path, 'status' => 'Ready', 'generation_error' => null]);
+            return back()->with('success', 'Generated cutscene imported into the timeline.');
+        } catch (\Throwable $e) {
+            $scene->update(['status' => 'failed', 'generation_error' => $e->getMessage()]);
+            return back()->with('error', $e->getMessage());
+        }
     }
 
     public function attachVideo(Request $request, Scene $scene)
@@ -82,8 +126,9 @@ class SceneController extends Controller
      */
     public function edit(Scene $scene)
     {
-        $projects = Project::latest()->get();
-        $characters = Character::orderBy('name')->get();
+        $this->ensureSceneOwnership($scene);
+        $projects = Auth::user()->projects()->latest()->get();
+        $characters = Character::where('project_id', $scene->project_id)->orderBy('name')->get();
         
         // Load existing character IDs so we can check the boxes in the UI
         $selectedCharacters = $scene->characters->pluck('id')->toArray();
@@ -96,6 +141,8 @@ class SceneController extends Controller
      */
     public function update(Request $request, Scene $scene)
     {
+        $this->ensureSceneOwnership($scene);
+
         $validated = $request->validate([
             'project_id' => 'required|exists:projects,id',
             'order_index' => 'required|integer|min:1',
@@ -149,6 +196,22 @@ class SceneController extends Controller
             'characters.*' => 'exists:characters,id'
         ]);
 
+        Auth::user()->projects()->findOrFail($validated['project_id']);
+
+        if (!empty($validated['characters'])) {
+            $validCharacterCount = Character::where(function ($query) use ($validated) {
+                    $query->where('project_id', $validated['project_id'])->orWhereNull('project_id');
+                })
+                ->whereIn('id', $validated['characters'])
+                ->count();
+
+            abort_unless($validCharacterCount === count($validated['characters']), 422, 'Selected cast must belong to this project.');
+
+            Character::whereNull('project_id')
+                ->whereIn('id', $validated['characters'])
+                ->update(['project_id' => $validated['project_id']]);
+        }
+
         // 1. Initialize the new timeline block
         $scene = Scene::create([
             'project_id' => $validated['project_id'],
@@ -170,8 +233,14 @@ class SceneController extends Controller
     }
     public function destroy(Scene $scene)
     {
+        $this->ensureSceneOwnership($scene);
+
         // 1. Get the project ID before deleting so we can redirect back
         $projectId = $scene->project_id;
+
+        if ($scene->video_path && Storage::disk('public')->exists($scene->video_path)) {
+            Storage::disk('public')->delete($scene->video_path);
+        }
 
         // 2. Detach all assigned characters from the pivot table first
         $scene->characters()->detach();
@@ -180,8 +249,13 @@ class SceneController extends Controller
         $scene->delete();
 
         // 4. Redirect back to the timeline with a status message
-        return redirect()->route('projects.timeline', $projectId)
+        return redirect()->route('scenes.index')
             ->with('success', 'SEQUENCE PURGED FROM TIMELINE.');
+    }
+
+    private function ensureSceneOwnership(Scene $scene): void
+    {
+        abort_unless((int) $scene->project()->value('user_id') === (int) Auth::id(), 404);
     }
 
     public function generateSceneVideo(Request $request)

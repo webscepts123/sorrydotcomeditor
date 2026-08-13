@@ -11,6 +11,7 @@ use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SoundtrackController;
 use App\Http\Controllers\ProductionPlanController;
 use App\Http\Controllers\TrailerController; // <-- Added TrailerController
+use App\Http\Controllers\PosterController;
 
 /*
 |--------------------------------------------------------------------------
@@ -63,6 +64,7 @@ Route::middleware(['auth'])->group(function () {
     
     // Specific Action: Trigger single AI generation via AJAX in the Editor
     Route::post('/scenes/{scene}/render', [SceneController::class, 'render'])->name('scenes.render');
+    Route::post('/scenes/{scene}/sync-render', [SceneController::class, 'syncRender'])->name('scenes.sync-render');
     Route::post('/scenes/{scene}/attach-video', [SceneController::class, 'attachVideo'])->name('scenes.attach-video');
 
     /*
@@ -71,6 +73,8 @@ Route::middleware(['auth'])->group(function () {
     |----------------------------------------------------------------------
     */
     Route::resource('characters', CharacterController::class);
+    Route::post('/characters/generate-details', [CharacterController::class, 'generateDetails'])
+        ->name('characters.generate-details');
     Route::post('/characters/{character}/transfer', [CharacterController::class, 'transfer'])
     ->name('characters.transfer');
 
@@ -82,6 +86,9 @@ Route::middleware(['auth'])->group(function () {
     ->name('characters.sync-face');
     Route::resource('editors', EditorController::class);
     Route::resource('trailers', TrailerController::class); // <-- Added Trailer Route
+    Route::get('/posters', [PosterController::class, 'index'])->name('posters.index');
+    Route::post('/posters/generate-ideas', [PosterController::class, 'generateIdeas'])->name('posters.generate-ideas');
+    Route::post('/posters/generate', [PosterController::class, 'generate'])->name('posters.generate');
 
     /*
     |----------------------------------------------------------------------
@@ -104,6 +111,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/planning', [ProductionPlanController::class, 'index'])->name('planning.index');
     Route::post('/planning', [ProductionPlanController::class, 'update'])->name('planning.update');
+    Route::post('/planning/generate-story', [ProductionPlanController::class, 'generateStory'])->name('planning.generate-story');
 
     Route::prefix('tools')->name('tools.')->group(function () {
         Route::get('/sync-face', [App\Http\Controllers\ToolController::class, 'syncFace'])->name('sync-face');

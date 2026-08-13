@@ -27,7 +27,7 @@ class SoundtrackController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'composer' => 'required|string|max:255',
-            'type' => 'required|string',
+            'type' => 'required|in:cinematic,ambient,foley,dialogue',
             'notes' => 'nullable|string',
             'audio_file' => 'required|file|mimes:mp3,wav|max:51200', // 50MB Max
         ]);
@@ -42,7 +42,7 @@ class SoundtrackController extends Controller
                 'title' => $validated['title'],
                 'composer' => $validated['composer'],
                 'type' => $validated['type'],
-                'notes' => $validated['notes'],
+                'notes' => $validated['notes'] ?? null,
                 'file_path' => $filePath,
             ]);
         }
@@ -67,7 +67,7 @@ class SoundtrackController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'composer' => 'required|string|max:255',
-            'type' => 'required|string',
+            'type' => 'required|in:cinematic,ambient,foley,dialogue',
             'notes' => 'nullable|string',
             'audio_file' => 'nullable|file|mimes:mp3,wav|max:51200', // Optional on update
         ]);
@@ -76,7 +76,7 @@ class SoundtrackController extends Controller
             'title' => $validated['title'],
             'composer' => $validated['composer'],
             'type' => $validated['type'],
-            'notes' => $validated['notes'],
+            'notes' => $validated['notes'] ?? null,
         ];
 
         // If you uploaded a replacement file...

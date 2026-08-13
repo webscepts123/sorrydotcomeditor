@@ -30,6 +30,15 @@
                 @csrf
                 @method('PUT')
 
+                <div class="mb-4">
+                    <label class="form-label text-secondary small tracking-widest uppercase">Movie / Project</label>
+                    <select name="project_id" class="form-select bg-black border-0 border-bottom border-secondary rounded-0 text-white p-2" required>
+                        @foreach($projects as $project)
+                            <option value="{{ $project->id }}" {{ old('project_id', $character->project_id) == $project->id ? 'selected' : '' }}>{{ strtoupper($project->title) }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
                 {{-- NAME --}}
                 <div class="mb-4">
                     <label class="form-label text-secondary small tracking-widest uppercase">Character Name</label>
@@ -70,6 +79,13 @@
 
                         </select>
                     </div>
+                </div>
+
+                <div class="d-flex justify-content-end align-items-center gap-3 mb-3">
+                    <small id="ai-details-status" class="text-secondary"></small>
+                    <button id="generate-details-button" type="button" onclick="generateCharacterDetails()" class="btn btn-outline-info btn-sm rounded-0 tracking-widest uppercase">
+                        Generate All 3 with AI
+                    </button>
                 </div>
 
                 {{-- DESCRIPTION --}}
@@ -193,6 +209,47 @@
 </style>
 
 <script>
+async function generateCharacterDetails() {
+    const button = document.getElementById('generate-details-button');
+    const status = document.getElementById('ai-details-status');
+    const name = document.getElementById('name').value.trim();
+
+    if (!name) {
+        status.textContent = 'Enter a character name first.';
+        document.getElementById('name').focus();
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Generating...';
+    status.textContent = 'AI is designing the character...';
+
+    try {
+        const response = await fetch(@json(route('characters.generate-details')), {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': @json(csrf_token()),
+            },
+            body: JSON.stringify({ name, role: document.getElementById('role').value }),
+        });
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.message || 'AI generation failed.');
+
+        document.getElementById('description').value = data.description;
+        document.getElementById('personality').value = data.personality;
+        document.getElementById('dialogue_style').value = data.dialogue_style;
+        status.textContent = 'All three fields generated.';
+    } catch (error) {
+        status.textContent = error.message;
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Generate All 3 with AI';
+    }
+}
+
 function generatePrompt() {
     let name = document.getElementById('name').value.trim() || 'Unnamed Character';
     let aiTag = document.getElementById('ai_tag').value.trim() || '@character_seed_default';

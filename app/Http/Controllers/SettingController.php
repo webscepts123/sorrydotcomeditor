@@ -37,6 +37,8 @@ class SettingController extends Controller
             'seedance_api_key' => env('SEEDANCE_API_KEY', ''),
             'seedance_base_url' => env('SEEDANCE_BASE_URL', ''),
             'openai_api_key' => env('OPENAI_API_KEY', ''),
+            'comfyui_url' => env('COMFYUI_URL', 'http://127.0.0.1:8188'),
+            'comfyui_video_workflow' => env('COMFYUI_VIDEO_WORKFLOW', 'storage/app/comfyui/wan_t2v_api.json'),
             'default_render_resolution' => env('DEFAULT_RENDER_RESOLUTION', '4k'),
             'db_status' => $dbStatus,
             'db_online' => $dbOnline,
@@ -63,6 +65,8 @@ class SettingController extends Controller
             'seedance_api_key' => 'nullable|string',
             'seedance_base_url' => 'nullable|url',
             'openai_api_key' => 'nullable|string',
+            'comfyui_url' => 'required|url',
+            'comfyui_video_workflow' => 'required|string|max:500',
             'default_render_resolution' => 'required|in:720p,1080p,2k,4k,8k',
         ]);
 
@@ -70,6 +74,8 @@ class SettingController extends Controller
             'SEEDANCE_API_KEY' => $validated['seedance_api_key'] ?? '',
             'SEEDANCE_BASE_URL' => $validated['seedance_base_url'] ?? '',
             'OPENAI_API_KEY' => $validated['openai_api_key'] ?? '',
+            'COMFYUI_URL' => $validated['comfyui_url'],
+            'COMFYUI_VIDEO_WORKFLOW' => $validated['comfyui_video_workflow'],
             'DEFAULT_RENDER_RESOLUTION' => $validated['default_render_resolution'],
         ]);
 

@@ -10,7 +10,7 @@
                 </a>
             @endif
 
-            <a href="{{ isset($project) ? route('projects.editor', $project) : route('scenes.create') }}" class="btn btn-outline-light btn-sm rounded-0 px-3 small">
+            <a href="{{ route('scenes.create', isset($project) ? ['project' => $project->id] : []) }}" class="btn btn-outline-light btn-sm rounded-0 px-3 small">
                 NEW CLIP +
             </a>        
         </div>

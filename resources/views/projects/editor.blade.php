@@ -8,8 +8,11 @@
             <span class="badge bg-danger ms-3 rounded-0 small tracking-widest uppercase">LIVE: {{ $project->title }}</span>
         </div>
         <div class="d-flex gap-3">
-            <button class="btn btn-outline-secondary btn-sm rounded-0 tracking-widest uppercase">Export XML</button>
-            <button id="render-batch" class="btn btn-white bg-white text-black btn-sm rounded-0 fw-bold tracking-widest px-4">BATCH RENDER (ALL SCENES)</button>
+            <a href="{{ route('projects.export-xml', $project) }}" class="btn btn-outline-secondary btn-sm rounded-0 tracking-widest uppercase">Export XML</a>
+            <form action="{{ route('projects.render-batch', $project) }}" method="POST" class="m-0" onsubmit="return startBatchRender(this)">
+                @csrf
+                <button id="render-batch" type="submit" class="btn btn-white bg-white text-black btn-sm rounded-0 fw-bold tracking-widest px-4" {{ $project->scenes->isEmpty() ? 'disabled' : '' }}>BATCH RENDER (ALL SCENES)</button>
+            </form>
         </div>
     </div>
 
@@ -24,6 +27,12 @@
                 <code class="ms-auto text-info" style="font-size: 10px;">{{ $char->ai_tag }}</code>
             </div>
             @endforeach
+            @if($project->characters->isEmpty())
+                <div class="border border-secondary p-3 text-center">
+                    <p class="text-secondary small mb-2">No cast assigned to this project.</p>
+                    <a href="{{ route('characters.create', ['project' => $project->id]) }}" class="btn btn-outline-light btn-sm rounded-0 w-100 tracking-widest" style="font-size:9px;">ADD CHARACTER</a>
+                </div>
+            @endif
             
             <hr class="border-secondary my-4">
             
@@ -36,6 +45,17 @@
 
         <div class="col-md-7 p-4 overflow-auto border-end border-secondary">
             <h6 class="text-secondary small tracking-widest mb-4 uppercase">Production Timeline ({{ $project->scenes->count() }} Segments)</h6>
+
+            @if($project->scenes->isEmpty())
+                <div class="border border-secondary d-flex align-items-center justify-content-center text-center p-5" style="min-height:360px;">
+                    <div>
+                        <i class="bi bi-film text-secondary fs-1"></i>
+                        <h6 class="mt-3 tracking-widest">TIMELINE IS EMPTY</h6>
+                        <p class="text-secondary small">Create the first scene to begin building this movie.</p>
+                        <a href="{{ route('scenes.create', ['project' => $project->id]) }}" class="btn btn-outline-info rounded-0 px-4 tracking-widest small">NEW CLIP +</a>
+                    </div>
+                </div>
+            @endif
             
             @foreach($project->scenes->sortBy('order_index') as $scene)
             <div class="scene-row mb-4 p-3 border border-secondary bg-black transition-hover shadow-sm">
@@ -101,7 +121,7 @@
                             @endif
                         </div>
                         
-                        <a href="{{ route('projects.editor', $project->id) }}?active_scene={{ $scene->id }}" class="btn btn-outline-secondary btn-sm w-100 rounded-0 uppercase tracking-widest mt-auto" style="font-size: 10px;">
+                        <a href="{{ route('projects.videoeditor', $project->id) }}?active_scene={{ $scene->id }}" class="btn btn-outline-secondary btn-sm w-100 rounded-0 uppercase tracking-widest mt-auto" style="font-size: 10px;">
                             <i class="bi bi-film me-1"></i> ADVANCED VIDEO EDIT
                         </a>
                     </div>
@@ -127,9 +147,18 @@
                         <form action="{{ route('scenes.render', $scene) }}" method="POST" class="mt-2">
                             @csrf
                             <button type="submit" class="btn btn-outline-info w-100 btn-sm rounded-0 small uppercase tracking-widest fw-bold py-2">
-                                <i class="bi bi-cpu-fill me-1"></i> RENDER CLIP
+                                <i class="bi bi-cpu-fill me-1"></i> GENERATE LOCAL AI CUTSCENE
                             </button>
                         </form>
+                        @if($scene->generation_job_id)
+                            <form action="{{ route('scenes.sync-render', $scene) }}" method="POST" class="mt-2">
+                                @csrf
+                                <button type="submit" class="btn btn-outline-warning w-100 btn-sm rounded-0 small uppercase tracking-widest">CHECK RENDER STATUS</button>
+                            </form>
+                        @endif
+                        @if($scene->generation_error)
+                            <small class="text-danger d-block mt-2">{{ $scene->generation_error }}</small>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -166,4 +195,13 @@
     ::-webkit-scrollbar-thumb { background: #333; }
     .dropdown-item:hover { background-color: #fff !important; color: #000 !important; }
 </style>
+
+<script>
+function startBatchRender(form) {
+    const button = document.getElementById('render-batch');
+    button.disabled = true;
+    button.textContent = 'QUEUEING SCENES...';
+    return true;
+}
+</script>
 @endsection

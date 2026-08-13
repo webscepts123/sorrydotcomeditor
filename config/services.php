@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'comfyui' => [
+        'url' => env('COMFYUI_URL', 'http://127.0.0.1:8188'),
+        'workflow' => env('COMFYUI_VIDEO_WORKFLOW', 'storage/app/comfyui/wan_t2v_api.json'),
+    ],
+
 ];

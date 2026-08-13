@@ -111,8 +111,13 @@ class ProjectController extends Controller
 
     public function editor(Project $project)
     {
+        abort_unless((int) $project->user_id === (int) Auth::id(), 404);
+
         // Eager load scenes and characters for the editor view
-        $project->load(['scenes', 'characters']);
+        $project->load([
+            'scenes' => fn ($query) => $query->orderBy('order_index'),
+            'characters',
+        ]);
         
         return view('projects.editor', compact('project'));
     }
@@ -133,15 +138,23 @@ class ProjectController extends Controller
 
     public function renderBatch(Project $project)
     {
-        $project->scenes()
+        abort_unless((int) $project->user_id === (int) Auth::id(), 404);
+
+        $queued = $project->scenes()
             ->whereIn('status', ['Draft', 'Ready', 'failed'])
             ->update(['status' => 'Processing']);
 
-        return back()->with('success', 'Batch render queued for this project.');
+        if ($queued === 0) {
+            return back()->with('error', 'No eligible scenes are available to render.');
+        }
+
+        return back()->with('success', "{$queued} scene(s) queued for rendering.");
     }
 
     public function exportXml(Project $project)
     {
+        abort_unless((int) $project->user_id === (int) Auth::id(), 404);
+
         $project->load(['scenes' => function ($query) {
             $query->orderBy('order_index');
         }]);

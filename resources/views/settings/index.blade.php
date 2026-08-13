@@ -24,10 +24,22 @@
     <div class="row g-5">
         <div class="col-lg-6">
             <div class="bg-black border border-secondary p-4 h-100">
-                <h5 class="text-white small tracking-widest uppercase mb-4 border-bottom border-secondary pb-2">AI ENGINE (SEEDANCE 2.0)</h5>
+                <h5 class="text-white small tracking-widest uppercase mb-4 border-bottom border-secondary pb-2">AI ENGINES</h5>
                 
                 <form action="{{ route('settings.update') }}" method="POST">
                     @csrf
+                    <div class="mb-4">
+                        <label class="form-label text-secondary small tracking-widest uppercase">Local ComfyUI URL</label>
+                        <input type="url" name="comfyui_url" class="form-control bg-transparent border-0 border-bottom border-secondary rounded-0 text-white p-2" value="{{ old('comfyui_url', $settings['comfyui_url']) }}" required>
+                        <small class="text-secondary">Free local Wan video engine (default port 8188).</small>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label text-secondary small tracking-widest uppercase">Wan API Workflow File</label>
+                        <input type="text" name="comfyui_video_workflow" class="form-control bg-transparent border-0 border-bottom border-secondary rounded-0 text-white p-2" value="{{ old('comfyui_video_workflow', $settings['comfyui_video_workflow']) }}" required>
+                        <small class="text-secondary">Export a ComfyUI workflow in API format and use <code>{{ '{{PROMPT}}' }}</code> in its positive prompt.</small>
+                    </div>
+
                     <div class="mb-4">
                         <label class="form-label text-secondary small tracking-widest uppercase">Seedance API Key</label>
                         <input type="password"

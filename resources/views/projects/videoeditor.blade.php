@@ -414,7 +414,7 @@
                             <input type="hidden" name="preserve_characters" value="1">
                             <input type="hidden" name="return_to_videoeditor" value="1">
                             
-                            <label class="text-info fw-bold mb-2 uppercase" style="font-size: 9px; letter-spacing:1px;">Seedance Generation Logic</label>
+                            <label class="text-info fw-bold mb-2 uppercase" style="font-size: 9px; letter-spacing:1px;">Local Wan / ComfyUI Generation</label>
                             
                             <label class="input-label mb-1">Target Action Prompt</label>
                             <textarea name="script_segment" class="nle-textarea" rows="4">{{ $currentScene->script_segment }}</textarea>
@@ -476,6 +476,12 @@
                             @csrf
                             <button type="submit" class="nle-btn nle-btn-primary w-100 py-2 fw-bold"><i class="bi bi-cpu-fill me-2"></i>Render AI Clip</button>
                         </form>
+                        @if($currentScene->generation_job_id)
+                            <form action="{{ route('scenes.sync-render', $currentScene) }}" method="POST" class="mt-2">
+                                @csrf
+                                <button type="submit" class="nle-btn w-100">Check Render Status / Import</button>
+                            </form>
+                        @endif
 
                         <form action="{{ route('scenes.attach-video', $currentScene) }}" method="POST" enctype="multipart/form-data" class="mt-3 pt-3 border-top border-secondary">
                             @csrf

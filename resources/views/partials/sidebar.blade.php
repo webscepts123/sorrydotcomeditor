@@ -57,6 +57,11 @@
             </a>
         </li>
         <li>
+            <a href="{{ route('posters.index') }}" class="nav-link {{ request()->routeIs('posters.*') ? 'active bg-white text-black' : 'text-white' }} rounded-0 mb-2 tracking-widest small">
+                MOVIE POSTERS
+            </a>
+        </li>
+        <li>
             <a href="{{ route('soundtracks.index') }}" class="nav-link {{ request()->routeIs('soundtracks.*') ? 'active bg-white text-black' : 'text-white' }} rounded-0 mb-4 tracking-widest small">
                 SOUNDTRACKS
             </a>

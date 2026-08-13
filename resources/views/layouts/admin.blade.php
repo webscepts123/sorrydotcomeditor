@@ -28,6 +28,12 @@
         @include('partials.topbar')
         
         <main class="p-4">
+            @if(session('success'))
+                <div class="alert alert-success bg-black border-success text-success rounded-0">{{ session('success') }}</div>
+            @endif
+            @if(session('error'))
+                <div class="alert alert-danger bg-black border-danger text-danger rounded-0">{{ session('error') }}</div>
+            @endif
             @yield('content')
         </main>
     </div>

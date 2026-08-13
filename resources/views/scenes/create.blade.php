@@ -28,10 +28,10 @@
                     <div class="row mb-4">
                         <div class="col-md-8 mb-4 mb-md-0">
                             <label class="form-label text-secondary small tracking-widest uppercase">Target Production</label>
-                            <select name="project_id" class="form-select bg-black border-0 border-bottom border-secondary rounded-0 text-white p-2" required>
+                            <select id="scene-project" name="project_id" class="form-select bg-black border-0 border-bottom border-secondary rounded-0 text-white p-2" required>
                                 <option value="">SELECT PROJECT...</option>
                                 @foreach($projects as $proj)
-                                    <option value="{{ $proj->id }}" {{ (old('project_id') ?? request('project')) == $proj->id ? 'selected' : '' }}>
+                                    <option value="{{ $proj->id }}" {{ (int) old('project_id', $selectedProjectId) === $proj->id ? 'selected' : '' }}>
                                         {{ strtoupper($proj->title) }}
                                     </option>
                                 @endforeach
@@ -65,9 +65,9 @@
                     <h6 class="text-white small tracking-widest uppercase mb-3">AI Cast Assignment</h6>
                     <p class="text-secondary small italic mb-4">Select the characters appearing in this scene. Their AI Seeds will be automatically injected into the Seedance 2.0 prompt.</p>
                     
-                    <div class="list-group rounded-0">
+                    <div id="cast-list" class="list-group rounded-0">
                         @forelse($characters as $character)
-                        <label class="list-group-item bg-dark border-secondary text-white d-flex align-items-center mb-2 transition-hover p-2">
+                        <label class="cast-item list-group-item bg-dark border-secondary text-white d-flex align-items-center mb-2 transition-hover p-2" data-project-id="{{ $character->project_id }}">
                             <input class="form-check-input me-3 bg-black border-secondary" type="checkbox" name="characters[]" value="{{ $character->id }}"
                                 {{ (is_array(old('characters')) && in_array($character->id, old('characters'))) ? 'checked' : '' }}>
                             
@@ -90,10 +90,15 @@
                             </div>
                         </label>
                         @empty
-                        <div class="text-center p-3 border border-dashed border-secondary">
+                        <div id="cast-empty" class="text-center p-3 border border-dashed border-secondary">
                             <span class="text-secondary small uppercase tracking-widest">No Cast Initialized in System.</span>
+                            <a href="{{ route('characters.create', ['project' => $selectedProjectId]) }}" class="btn btn-outline-light btn-sm rounded-0 d-block mt-3">CREATE CHARACTER</a>
                         </div>
                         @endforelse
+                    </div>
+                    <div id="cast-filter-empty" class="text-center p-3 border border-dashed border-secondary d-none">
+                        <span class="text-secondary small uppercase tracking-widest">No cast assigned to this project.</span>
+                        <a id="create-character-link" href="{{ route('characters.create', ['project' => $selectedProjectId]) }}" data-base-url="{{ route('characters.create') }}" class="btn btn-outline-light btn-sm rounded-0 d-block mt-3">CREATE CHARACTER</a>
                     </div>
                 </div>
             </div>
@@ -115,4 +120,31 @@
     .transition-hover:hover { border-color: #fff !important; background: #111 !important; cursor: pointer; }
     .btn-white:hover { background: #ccc !important; transform: scale(1.02); transition: 0.2s; }
 </style>
+
+<script>
+const projectSelect = document.getElementById('scene-project');
+
+function filterCastByProject() {
+    const projectId = projectSelect.value;
+    const castItems = [...document.querySelectorAll('.cast-item')];
+    let visibleCount = 0;
+
+    castItems.forEach((item) => {
+        const belongsTo = item.dataset.projectId;
+        const visible = projectId && (belongsTo === projectId || belongsTo === '');
+        item.classList.toggle('d-none', !visible);
+        item.querySelector('input').disabled = !visible;
+        if (visible) visibleCount++;
+    });
+
+    const emptyState = document.getElementById('cast-filter-empty');
+    if (emptyState) emptyState.classList.toggle('d-none', visibleCount > 0 || !projectId);
+
+    const createLink = document.getElementById('create-character-link');
+    if (createLink) createLink.href = createLink.dataset.baseUrl + '?project=' + encodeURIComponent(projectId);
+}
+
+projectSelect.addEventListener('change', filterCastByProject);
+filterCastByProject();
+</script>
 @endsection
