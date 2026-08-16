@@ -62,7 +62,7 @@
                             <div class="spinner-grow spinner-grow-sm text-info me-3" role="status"></div>
                             <div class="small">
                                 <div class="fw-bold text-uppercase">SEQ {{ str_pad($renderingScene->order_index, 3, '0', STR_PAD_LEFT) }}</div>
-                                <div class="text-secondary" style="font-size: 0.7rem;">SEEDANCE 2.0 - GENERATING CLIP...</div>
+                                <div class="text-secondary" style="font-size: 0.7rem;">WAN / COMFYUI - GENERATING CLIP...</div>
                             </div>
                         </div>
                     @else
@@ -86,9 +86,22 @@
         </div>
 
         <div class="col-md-4">
-            <div class="card bg-black border border-secondary text-white rounded-0 h-100">
+            <div id="runpod-resource-card" data-status-url="{{ route('dashboard.runpod-status') }}" class="card bg-black border border-secondary text-white rounded-0 h-100">
                 <div class="card-body">
-                    <h6 class="text-secondary small mb-3 tracking-widest">VDS RESOURCES</h6>
+                    <div class="d-flex justify-content-between align-items-start mb-3 gap-2">
+                        <h6 class="text-secondary small mb-0 tracking-widest">RUNPOD RESOURCES</h6>
+                        <span id="runpod-online" class="badge rounded-0 border border-{{ $runpod['online'] ? 'success text-success' : 'danger text-danger' }}">
+                            {{ $runpod['online'] ? 'ONLINE' : 'OFFLINE' }}
+                        </span>
+                    </div>
+                    <div class="small mb-3">
+                        <div id="runpod-name" class="fw-bold text-break">{{ $runpod['pod_name'] ?: 'RUNPOD' }}</div>
+                        <div id="runpod-id" class="text-secondary text-break" style="font-size: .65rem;">{{ $runpod['pod_id'] ?: 'POD ID NOT CONFIGURED' }}</div>
+                        <div id="runpod-gpu" class="text-secondary mt-1" style="font-size: .65rem;">
+                            {{ $runpod['gpu_name'] ?: 'GPU unavailable' }}
+                            @if($runpod['hourly_cost'] !== null) · ${{ number_format((float) $runpod['hourly_cost'], 2) }}/HR @endif
+                        </div>
+                    </div>
                     <div class="mb-3">
                         <label class="small text-secondary d-block mb-1">STORAGE (NVMe)</label>
                         <div class="progress bg-dark rounded-0" style="height: 4px;">
@@ -96,12 +109,36 @@
                         </div>
                         <span class="text-secondary text-uppercase" style="font-size: 0.65rem;">{{ $usedGB }}GB / {{ $totalGB }}GB USED</span>
                     </div>
-                    <div>
-                        <label class="small text-secondary d-block mb-1">GPU CLUSTER LOAD</label>
+                    <div class="mb-3">
+                        <label class="small text-secondary d-block mb-1">GPU VRAM</label>
                         <div class="progress bg-dark rounded-0" style="height: 4px;">
-                            <div class="progress-bar bg-info" style="width: 5%"></div> </div>
-                        <span class="text-secondary" style="font-size: 0.65rem;">API STATUS: ONLINE / CONNECTED</span>
+                            <div id="runpod-vram-bar" class="progress-bar bg-info" style="width: {{ $runpod['vram_percent'] ?? 0 }}%"></div>
+                        </div>
+                        <span id="runpod-vram-text" class="text-secondary" style="font-size: 0.65rem;">
+                            @if($runpod['vram_total_gb'])
+                                {{ $runpod['vram_used_gb'] }}GB / {{ $runpod['vram_total_gb'] }}GB ({{ $runpod['vram_percent'] }}%)
+                            @else
+                                USAGE UNAVAILABLE
+                            @endif
+                        </span>
                     </div>
+                    <div class="mb-2">
+                        <label class="small text-secondary d-block mb-1">SYSTEM RAM</label>
+                        <div class="progress bg-dark rounded-0" style="height: 4px;">
+                            <div id="runpod-ram-bar" class="progress-bar bg-white" style="width: {{ $runpod['ram_percent'] ?? 0 }}%"></div>
+                        </div>
+                        <span id="runpod-ram-text" class="text-secondary" style="font-size: 0.65rem;">
+                            @if($runpod['ram_total_gb'])
+                                {{ $runpod['ram_used_gb'] }}GB / {{ $runpod['ram_total_gb'] }}GB ({{ $runpod['ram_percent'] }}%)
+                            @else
+                                USAGE UNAVAILABLE
+                            @endif
+                        </span>
+                    </div>
+                    <div id="runpod-runtime" class="text-secondary" style="font-size: .65rem;">
+                        COMFYUI {{ $runpod['comfyui_version'] ?: 'UNAVAILABLE' }} · RUNNING {{ $runpod['running_jobs'] }} · QUEUED {{ $runpod['pending_jobs'] }}
+                    </div>
+                    <div id="runpod-updated" class="text-secondary mt-1" style="font-size: .6rem;">LIVE AUTO-REFRESH</div>
                 </div>
             </div>
         </div>
@@ -183,4 +220,53 @@
     .tracking-widest { letter-spacing: 0.15em; font-family: 'Syncopate', sans-serif; }
     .btn-outline-light:hover { background-color: #fff; color: #000; }
 </style>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const card = document.getElementById('runpod-resource-card');
+    if (!card) return;
+
+    const byId = (id) => document.getElementById(id);
+    const value = (number) => Number.isFinite(Number(number)) ? Number(number) : null;
+    const usage = (used, total, percent) => {
+        const u = value(used), t = value(total), p = value(percent);
+        return u !== null && t !== null && p !== null ? `${u}GB / ${t}GB (${p}%)` : 'USAGE UNAVAILABLE';
+    };
+    let loading = false;
+
+    async function refreshRunPod() {
+        if (loading || document.hidden) return;
+        loading = true;
+        try {
+            const response = await fetch(card.dataset.statusUrl, {
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-store'
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            const badge = byId('runpod-online');
+            badge.textContent = data.online ? 'ONLINE' : 'OFFLINE';
+            badge.className = `badge rounded-0 border border-${data.online ? 'success text-success' : 'danger text-danger'}`;
+            byId('runpod-name').textContent = data.pod_name || 'RUNPOD';
+            byId('runpod-id').textContent = data.pod_id || 'POD ID NOT CONFIGURED';
+            byId('runpod-gpu').textContent = `${data.gpu_name || 'GPU unavailable'}${data.hourly_cost !== null ? ` · $${Number(data.hourly_cost).toFixed(2)}/HR` : ''}`;
+            byId('runpod-vram-bar').style.width = `${value(data.vram_percent) ?? 0}%`;
+            byId('runpod-vram-text').textContent = usage(data.vram_used_gb, data.vram_total_gb, data.vram_percent);
+            byId('runpod-ram-bar').style.width = `${value(data.ram_percent) ?? 0}%`;
+            byId('runpod-ram-text').textContent = usage(data.ram_used_gb, data.ram_total_gb, data.ram_percent);
+            byId('runpod-runtime').textContent = `COMFYUI ${data.comfyui_version || 'UNAVAILABLE'} · RUNNING ${data.running_jobs || 0} · QUEUED ${data.pending_jobs || 0}`;
+            byId('runpod-updated').textContent = `UPDATED ${new Date(data.checked_at).toLocaleTimeString()} · AUTO-REFRESH 5S`;
+        } catch (error) {
+            byId('runpod-online').textContent = 'CONNECTION ERROR';
+            byId('runpod-online').className = 'badge rounded-0 border border-danger text-danger';
+            byId('runpod-updated').textContent = 'LIVE UPDATE FAILED · RETRYING';
+        } finally {
+            loading = false;
+        }
+    }
+
+    refreshRunPod();
+    setInterval(refreshRunPod, 5000);
+    document.addEventListener('visibilitychange', refreshRunPod);
+});
+</script>
 @endsection

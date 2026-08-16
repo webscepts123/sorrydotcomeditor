@@ -60,11 +60,14 @@
                         <textarea name="script_segment" rows="5" class="form-control bg-transparent border border-secondary rounded-0 text-white p-3 italic" required>{{ $scene->script_segment }}</textarea>
                     </div>
 
-                    <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
                         <a href="{{ route('projects.timeline', $scene->project_id) }}" class="text-secondary text-decoration-none small tracking-widest uppercase hover-white">Cancel Changes</a>
-                        <button type="submit" class="btn btn-white bg-white text-black rounded-0 px-5 py-3 fw-bold tracking-widest uppercase">
-                            UPDATE SEQUENCE
-                        </button>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="submit" class="btn btn-outline-light rounded-0 px-4 py-3 fw-bold tracking-widest uppercase">Save Only</button>
+                            <button type="submit" name="regenerate_video" value="1" class="btn btn-white bg-white text-black rounded-0 px-4 py-3 fw-bold tracking-widest uppercase" onclick="this.innerText='QUEUEING NEW VIDEO...';">
+                                Update & Regenerate Video
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

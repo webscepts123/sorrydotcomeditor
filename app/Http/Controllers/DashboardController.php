@@ -8,13 +8,22 @@ use App\Models\Project;
 use App\Models\Editor;
 use App\Models\Scene;
 use App\Models\VideoClip;
+use App\Services\RunPodStatusService;
 
 class DashboardController extends Controller
 {
+    public function runPodStatus(RunPodStatusService $runPodStatusService)
+    {
+        return response()->json([
+            ...$runPodStatusService->get(),
+            'checked_at' => now()->toIso8601String(),
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate');
+    }
+
     /**
      * Display the Production Command Center.
      */
-    public function index()
+    public function index(RunPodStatusService $runPodStatusService)
     {
         // 1. Get the Active Production (Most recently updated project)
         $activeProject = Project::withCount('scenes')->latest('updated_at')->first();
@@ -41,12 +50,13 @@ class DashboardController extends Controller
 
         // 4. Load Team
         $editors = Editor::latest()->take(5)->get(); // Adjust model name if needed
+        $runpod = $runPodStatusService->get();
 
         return view('dashboard', compact(
             'activeProject', 'totalMinutes', 'progressPercent', 
             'renderingScene', 'nextScene', 
             'usedGB', 'totalGB', 'storagePercent', 
-            'editors'
+            'editors', 'runpod'
         ));
     }
 }

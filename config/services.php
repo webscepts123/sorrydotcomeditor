@@ -40,4 +40,11 @@ return [
         'workflow' => env('COMFYUI_VIDEO_WORKFLOW', 'storage/app/comfyui/wan_t2v_api.json'),
     ],
 
+    'runpod' => [
+        'pod_id' => env('RUNPOD_POD_ID'),
+        'pod_name' => env('RUNPOD_POD_NAME'),
+        'gpu_name' => env('RUNPOD_GPU_NAME', 'NVIDIA GeForce RTX 4090'),
+        'hourly_cost' => env('RUNPOD_HOURLY_COST'),
+    ],
+
 ];

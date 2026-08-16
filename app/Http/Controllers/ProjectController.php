@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Project;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use App\Services\ComfyVideoService;
 
 class ProjectController extends Controller
 {
@@ -63,12 +64,16 @@ class ProjectController extends Controller
 
     public function timeline(Project $project)
     {
+        abort_unless((int) $project->user_id === (int) Auth::id(), 404);
+
         // Load scenes strictly ordered by their timeline index
         $project->load(['scenes' => function ($query) {
-            $query->orderBy('order_index');
+            $query->with('characters')->orderBy('order_index');
         }]);
 
-        return view('projects.timeline', compact('project'));
+        $timelineProjects = Auth::user()->projects()->orderBy('title')->get();
+
+        return view('projects.timeline', compact('project', 'timelineProjects'));
     }
 
     public function destroy(Project $project)
@@ -136,19 +141,34 @@ class ProjectController extends Controller
         return view('projects.videoeditor', compact('project'));
     }
 
-    public function renderBatch(Project $project)
+    public function renderBatch(Project $project, ComfyVideoService $comfy)
     {
         abort_unless((int) $project->user_id === (int) Auth::id(), 404);
 
-        $queued = $project->scenes()
+        $scenes = $project->scenes()
+            ->with('characters')
             ->whereIn('status', ['Draft', 'Ready', 'failed'])
-            ->update(['status' => 'Processing']);
+            ->get();
+
+        $queued = 0;
+        $errors = [];
+        foreach ($scenes as $scene) {
+            try {
+                $jobId = $comfy->submitScene($scene);
+                $scene->update(['status' => 'Processing', 'generation_job_id' => $jobId, 'generation_error' => null]);
+                $queued++;
+            } catch (\Throwable $e) {
+                $scene->update(['status' => 'failed', 'generation_error' => $e->getMessage()]);
+                $errors[] = "Scene {$scene->order_index}: {$e->getMessage()}";
+            }
+        }
 
         if ($queued === 0) {
             return back()->with('error', 'No eligible scenes are available to render.');
         }
 
-        return back()->with('success', "{$queued} scene(s) queued for rendering.");
+        $response = back()->with('success', "{$queued} scene(s) queued in ComfyUI.");
+        return $errors ? $response->with('error', implode(' ', $errors)) : $response;
     }
 
     public function exportXml(Project $project)

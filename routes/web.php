@@ -31,6 +31,8 @@ Route::middleware(['auth'])->group(function () {
     
     // Core Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/runpod-status', [DashboardController::class, 'runPodStatus'])
+        ->name('dashboard.runpod-status');
     
     /*
     |----------------------------------------------------------------------

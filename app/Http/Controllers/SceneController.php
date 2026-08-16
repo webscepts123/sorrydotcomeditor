@@ -12,16 +12,23 @@ use App\Services\ComfyVideoService;
 
 class SceneController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $projects = Auth::user()->projects()->orderBy('title')->get();
+        $selectedProject = $request->filled('project_id')
+            ? $projects->firstWhere('id', (int) $request->query('project_id'))
+            : $projects->sortByDesc('updated_at')->first();
+
         $scenes = Scene::with('project')
+            ->with('characters')
             ->withCount('videoClips')
             ->whereHas('project', fn ($query) => $query->where('user_id', Auth::id()))
-            ->orderBy('project_id')
+            ->when($selectedProject, fn ($query) => $query->where('project_id', $selectedProject->id))
             ->orderBy('order_index')
-            ->paginate(15);
+            ->paginate(12)
+            ->withQueryString();
 
-        return view('scenes.index', compact('scenes'));
+        return view('scenes.index', compact('scenes', 'projects', 'selectedProject'));
     }
 
     public function create(Request $request)
@@ -53,22 +60,8 @@ class SceneController extends Controller
     {
         $this->ensureSceneOwnership($scene);
 
-        $scene->load('characters');
-        $cast = $scene->characters->map(fn ($character) => implode("\n", array_filter([
-            "Character: {$character->name} ({$character->role})",
-            $character->description,
-            $character->personality,
-        ])))->implode("\n\n");
-
-        $prompt = implode("\n\n", array_filter([
-            'Create a photorealistic live-action cinematic cutscene. Real human actors, natural movement, film lighting, coherent motion, professional camera work, 24fps movie aesthetic.',
-            "Scene action: {$scene->script_segment}",
-            $cast ? "Cast continuity:\n{$cast}" : null,
-            'No animation, cartoons, illustrations, game graphics, subtitles, logos, or watermarks.',
-        ]));
-
         try {
-            $jobId = $comfy->submit($prompt);
+            $jobId = $comfy->submitScene($scene);
             $scene->update(['status' => 'Processing', 'generation_job_id' => $jobId, 'generation_error' => null]);
             return back()->with('success', 'Local Wan/ComfyUI generation queued. Use Check Render Status to import the finished video.');
         } catch (\Throwable $e) {
@@ -139,7 +132,7 @@ class SceneController extends Controller
     /**
      * Update the scene in storage.
      */
-    public function update(Request $request, Scene $scene)
+    public function update(Request $request, Scene $scene, ComfyVideoService $comfy)
     {
         $this->ensureSceneOwnership($scene);
 
@@ -162,6 +155,26 @@ class SceneController extends Controller
             $scene->characters()->sync($validated['characters']);
         } else {
             $scene->characters()->detach();
+        }
+
+        if ($request->boolean('regenerate_video')) {
+            try {
+                $scene->refresh()->load('characters');
+                $jobId = $comfy->submitScene($scene);
+                $scene->update([
+                    'status' => 'Processing',
+                    'generation_job_id' => $jobId,
+                    'generation_error' => null,
+                ]);
+
+                return redirect()
+                    ->route('projects.timeline', $scene->project_id)
+                    ->with('success', 'Updated scene saved and replacement video queued using the new script and cast.');
+            } catch (\Throwable $e) {
+                $scene->update(['status' => 'failed', 'generation_error' => $e->getMessage()]);
+
+                return back()->withInput()->with('error', $e->getMessage());
+            }
         }
 
         if ($request->boolean('return_to_videoeditor')) {

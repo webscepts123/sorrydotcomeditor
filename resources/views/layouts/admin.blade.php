@@ -17,11 +17,22 @@
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #333; }
+        .app-shell > .w-100 { min-width: 0; }
+        @media (max-width: 767.98px) {
+            .app-shell { display: block !important; }
+            .app-shell > .flex-column { width: 100% !important; height: auto !important; min-height: auto; position: static; }
+            .app-shell > .flex-column .nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+            .app-shell > .flex-column .nav-link { margin-bottom: 0 !important; font-size: 10px; }
+            .app-shell > .flex-column hr, .app-shell > .flex-column .dropdown { display: none; }
+            main.p-4 { padding: 16px !important; }
+            .navbar .container-fluid { align-items: flex-start; flex-direction: column; gap: 10px; }
+            .navbar .ms-auto { margin-left: 0 !important; width: 100%; flex-wrap: wrap; }
+        }
     </style>
 </head>
 <body>
 
-<div class="d-flex">
+<div class="d-flex app-shell">
     @include('partials.sidebar')
 
     <div class="w-100 overflow-auto vh-100">
