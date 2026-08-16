@@ -28,8 +28,8 @@ class DashboardController extends Controller
         // 1. Get the Active Production (Most recently updated project)
         $activeProject = Project::withCount('scenes')->latest('updated_at')->first();
         
-        // Calculate minutes based on 15 seconds per scene (Seedance standard)
-        $totalMinutes = $activeProject ? ($activeProject->scenes_count * 15) / 60 : 0;
+        // Calculate minutes based on 15 minutes per scene
+        $totalMinutes = $activeProject ? ($activeProject->scenes_count * 15) : 0;
         $progressPercent = min(100, ($totalMinutes / 150) * 100); // 150 mins = 2.5 hours
 
         // 2. Get AI Render Queue Status

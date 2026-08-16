@@ -37,7 +37,7 @@ class ToolController extends Controller
         $detectedSceneCount = $sceneSource->count();
         $estimatedSeconds = $wordCount > 0
             ? max(60, (int) ceil(($wordCount / 130) * 60))
-            : max(0, $detectedSceneCount * 15);
+            : max(0, $detectedSceneCount * 15 * 60);
 
         return view('tools.script', [
             'projects' => $projects,
