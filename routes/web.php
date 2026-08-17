@@ -74,6 +74,10 @@ Route::middleware(['auth'])->group(function () {
     | Staff & Cast Management (AI Seeds & VFX Editors)
     |----------------------------------------------------------------------
     */
+    Route::get('/characters/export', [CharacterController::class, 'exportAll'])
+        ->name('characters.export-all');
+    Route::post('/characters/import', [CharacterController::class, 'import'])
+        ->name('characters.import');
     Route::resource('characters', CharacterController::class);
     Route::post('/characters/generate-details', [CharacterController::class, 'generateDetails'])
         ->name('characters.generate-details');
@@ -86,6 +90,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::post('/characters/{character}/sync-face', [CharacterController::class, 'sendToSyncFace'])
     ->name('characters.sync-face');
+
+    Route::get('/characters/{character}/export', [CharacterController::class, 'export'])
+        ->name('characters.export');
     Route::resource('editors', EditorController::class);
     Route::resource('trailers', TrailerController::class); // <-- Added Trailer Route
     Route::get('/posters', [PosterController::class, 'index'])->name('posters.index');

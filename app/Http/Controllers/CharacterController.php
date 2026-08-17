@@ -7,6 +7,7 @@ use App\Models\Character;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class CharacterController extends Controller
 {
@@ -251,6 +252,112 @@ class CharacterController extends Controller
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }
+    }
+
+    public function export(Character $character)
+    {
+        $filename = Str::slug($character->name) . '-character.json';
+
+        return response()->json($this->toExportArray($character), 200, [
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ], JSON_PRETTY_PRINT);
+    }
+
+    public function exportAll()
+    {
+        $characters = Character::latest()->get();
+
+        $payload = $characters->map(fn (Character $character) => $this->toExportArray($character))->all();
+
+        $filename = 'characters-export-' . now()->format('Y-m-d') . '.json';
+
+        return response()->json($payload, 200, [
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ], JSON_PRETTY_PRINT);
+    }
+
+    public function import(Request $request)
+    {
+        $validated = $request->validate([
+            'project_id' => 'required|integer',
+            'import_file' => 'required|file|max:10240',
+        ]);
+
+        $project = Auth::user()->projects()->findOrFail($validated['project_id']);
+
+        $decoded = json_decode($request->file('import_file')->get(), true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+            return back()->with('error', 'That file is not a valid character export.');
+        }
+
+        $records = array_is_list($decoded) ? $decoded : [$decoded];
+        $imported = 0;
+
+        foreach ($records as $record) {
+            if (!is_array($record) || empty($record['name'])) {
+                continue;
+            }
+
+            $imagePath = null;
+
+            if (!empty($record['image']['base64'])) {
+                $binary = base64_decode($record['image']['base64'], true);
+
+                if ($binary !== false) {
+                    $extension = pathinfo($record['image']['filename'] ?? '', PATHINFO_EXTENSION) ?: 'png';
+                    $imagePath = 'characters/' . uniqid() . '.' . $extension;
+                    Storage::disk('public')->put($imagePath, $binary);
+                }
+            }
+
+            Character::create([
+                'project_id' => $project->id,
+                'name' => (string) $record['name'],
+                'ai_tag' => $record['ai_tag'] ?? null,
+                'role' => $record['role'] ?? 'supporting',
+                'description' => $record['description'] ?? null,
+                'personality' => $record['personality'] ?? null,
+                'dialogue_style' => $record['dialogue_style'] ?? null,
+                'prompt' => $record['prompt'] ?? null,
+                'video_prompt' => $record['video_prompt'] ?? null,
+                'image_path' => $imagePath,
+            ]);
+
+            $imported++;
+        }
+
+        if ($imported === 0) {
+            return back()->with('error', 'No valid characters were found in that file.');
+        }
+
+        return redirect()->route('characters.index')
+            ->with('success', "Imported {$imported} character" . ($imported === 1 ? '' : 's') . " into {$project->title}.");
+    }
+
+    protected function toExportArray(Character $character): array
+    {
+        $image = null;
+
+        if ($character->image_path && Storage::disk('public')->exists($character->image_path)) {
+            $image = [
+                'filename' => basename($character->image_path),
+                'mime' => Storage::disk('public')->mimeType($character->image_path),
+                'base64' => base64_encode(Storage::disk('public')->get($character->image_path)),
+            ];
+        }
+
+        return [
+            'name' => $character->name,
+            'ai_tag' => $character->ai_tag,
+            'role' => $character->role,
+            'description' => $character->description,
+            'personality' => $character->personality,
+            'dialogue_style' => $character->dialogue_style,
+            'prompt' => $character->prompt,
+            'video_prompt' => $character->video_prompt,
+            'image' => $image,
+        ];
     }
 
     public function sendToSyncFace(Character $character)

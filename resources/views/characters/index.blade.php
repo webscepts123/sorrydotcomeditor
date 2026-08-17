@@ -10,9 +10,22 @@
             <h2 class="fw-light mb-0" style="font-family: 'Syncopate'; letter-spacing: 4px;">CHARACTERS</h2>
         </div>
 
-        <a href="{{ route('characters.create') }}" class="btn btn-white bg-white text-black rounded-0 px-4 py-2 fw-bold small tracking-widest uppercase">
-            NEW CHARACTER +
-        </a>
+        <div class="d-flex gap-2 flex-wrap">
+            <button type="button"
+                    class="btn btn-outline-light rounded-0 px-4 py-2 small tracking-widest uppercase"
+                    data-bs-toggle="modal"
+                    data-bs-target="#importCharactersModal">
+                <i class="bi bi-upload me-1"></i> IMPORT
+            </button>
+
+            <a href="{{ route('characters.export-all') }}" class="btn btn-outline-light rounded-0 px-4 py-2 small tracking-widest uppercase">
+                <i class="bi bi-download me-1"></i> EXPORT ALL
+            </a>
+
+            <a href="{{ route('characters.create') }}" class="btn btn-white bg-white text-black rounded-0 px-4 py-2 fw-bold small tracking-widest uppercase">
+                NEW CHARACTER +
+            </a>
+        </div>
     </div>
 
     @if(session('success'))
@@ -93,16 +106,21 @@
                         @if($character->image_path)
                             <a href="{{ asset('storage/' . $character->image_path) }}"
                                download="{{ Str::slug($character->name) }}-character-image"
-                               class="btn btn-outline-info w-100 rounded-0 small tracking-widest uppercase">
+                               class="btn btn-outline-info w-100 rounded-0 small tracking-widest uppercase mb-2">
                                 <i class="bi bi-download me-1"></i> Download Image
                             </a>
                         @else
                             <button type="button"
-                                    class="btn btn-outline-secondary w-100 rounded-0 small tracking-widest uppercase"
+                                    class="btn btn-outline-secondary w-100 rounded-0 small tracking-widest uppercase mb-2"
                                     disabled>
                                 <i class="bi bi-image me-1"></i> No Image
                             </button>
                         @endif
+
+                        <a href="{{ route('characters.export', $character) }}"
+                           class="btn btn-outline-light w-100 rounded-0 small tracking-widest uppercase">
+                            <i class="bi bi-file-earmark-arrow-down me-1"></i> Export JSON
+                        </a>
 
                         <form action="{{ route('characters.transfer', $character) }}" method="POST" class="mt-2">
                             @csrf
@@ -150,6 +168,54 @@
             {{ $characters->links() }}
         </div>
     @endif
+</div>
+
+<div class="modal fade" id="importCharactersModal" tabindex="-1" aria-labelledby="importCharactersModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content bg-black border border-secondary rounded-0 text-white">
+            <form action="{{ route('characters.import') }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title tracking-widest uppercase" id="importCharactersModalLabel" style="font-size: 14px;">
+                        Import Characters
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-secondary small mb-4">
+                        Upload a character export file (<code>.json</code>) generated from Export All or Export JSON. Accepts a single character or a full roster export.
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="text-secondary small tracking-widest uppercase d-block mb-1" style="font-size: 10px;">
+                            Destination Project
+                        </label>
+                        <select name="project_id" class="form-select bg-black border-secondary text-white rounded-0" required>
+                            <option value="">Select a project</option>
+                            @foreach($projects as $project)
+                                <option value="{{ $project->id }}">{{ $project->title }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="text-secondary small tracking-widest uppercase d-block mb-1" style="font-size: 10px;">
+                            Export File
+                        </label>
+                        <input type="file" name="import_file" accept=".json,application/json" class="form-control bg-black border-secondary text-white rounded-0" required>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-secondary rounded-0 small tracking-widest uppercase" data-bs-dismiss="modal">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-white bg-white text-black rounded-0 fw-bold small tracking-widest uppercase">
+                        Import
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <style>

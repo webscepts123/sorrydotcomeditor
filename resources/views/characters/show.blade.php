@@ -110,6 +110,11 @@
                     </button>
                 @endif
 
+                <a href="{{ route('characters.export', $character) }}" class="action-btn action-info">
+                    <i class="bi bi-file-earmark-arrow-down"></i>
+                    <span>Export JSON</span>
+                </a>
+
                 <form action="{{ route('characters.sync-face', $character) }}" method="POST" class="js-action-form">
                     @csrf
                     <button type="submit"
