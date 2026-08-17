@@ -182,6 +182,22 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    @if($errors->any())
+                        <div class="alert alert-danger bg-black border border-danger text-danger rounded-0 small mb-3">
+                            <ul class="mb-0 ps-3">
+                                @foreach($errors->all() as $message)
+                                    <li>{{ $message }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+
+                    @if($projects->isEmpty())
+                        <div class="alert alert-warning bg-black border border-warning text-warning rounded-0 small mb-3">
+                            You have no projects yet. Create a project before importing characters.
+                        </div>
+                    @endif
+
                     <p class="text-secondary small mb-4">
                         Upload a character export file (<code>.json</code>) generated from Export All or Export JSON. Accepts a single character or a full roster export.
                     </p>
@@ -190,10 +206,12 @@
                         <label class="text-secondary small tracking-widest uppercase d-block mb-1" style="font-size: 10px;">
                             Destination Project
                         </label>
-                        <select name="project_id" class="form-select bg-black border-secondary text-white rounded-0" required>
+                        <select name="project_id" class="form-select bg-black border-secondary text-white rounded-0" required {{ $projects->isEmpty() ? 'disabled' : '' }}>
                             <option value="">Select a project</option>
                             @foreach($projects as $project)
-                                <option value="{{ $project->id }}">{{ $project->title }}</option>
+                                <option value="{{ $project->id }}" {{ (string) old('project_id') === (string) $project->id ? 'selected' : '' }}>
+                                    {{ $project->title }}
+                                </option>
                             @endforeach
                         </select>
                     </div>
@@ -202,14 +220,14 @@
                         <label class="text-secondary small tracking-widest uppercase d-block mb-1" style="font-size: 10px;">
                             Export File
                         </label>
-                        <input type="file" name="import_file" accept=".json,application/json" class="form-control bg-black border-secondary text-white rounded-0" required>
+                        <input type="file" name="import_file" accept=".json,application/json" class="form-control bg-black border-secondary text-white rounded-0" required {{ $projects->isEmpty() ? 'disabled' : '' }}>
                     </div>
                 </div>
                 <div class="modal-footer border-secondary">
                     <button type="button" class="btn btn-outline-secondary rounded-0 small tracking-widest uppercase" data-bs-dismiss="modal">
                         Cancel
                     </button>
-                    <button type="submit" class="btn btn-white bg-white text-black rounded-0 fw-bold small tracking-widest uppercase">
+                    <button type="submit" class="btn btn-white bg-white text-black rounded-0 fw-bold small tracking-widest uppercase" {{ $projects->isEmpty() ? 'disabled' : '' }}>
                         Import
                     </button>
                 </div>
@@ -217,6 +235,28 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var importModalEl = document.getElementById('importCharactersModal');
+    var importModal = new bootstrap.Modal(importModalEl);
+    var hasImportErrors = @json($errors->any());
+
+    if (hasImportErrors) {
+        importModal.show();
+    }
+
+    var importForm = importModalEl.querySelector('form');
+    importForm.addEventListener('submit', function () {
+        var button = importForm.querySelector('button[type="submit"]');
+        if (!button || button.disabled) return;
+
+        button.dataset.originalText = button.innerHTML;
+        button.innerHTML = 'Uploading…';
+        button.disabled = true;
+    });
+});
+</script>
 
 <style>
     .uppercase {

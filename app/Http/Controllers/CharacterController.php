@@ -280,7 +280,7 @@ class CharacterController extends Controller
     {
         $validated = $request->validate([
             'project_id' => 'required|integer',
-            'import_file' => 'required|file|max:10240',
+            'import_file' => 'required|file|max:51200',
         ]);
 
         $project = Auth::user()->projects()->findOrFail($validated['project_id']);
