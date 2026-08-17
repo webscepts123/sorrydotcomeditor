@@ -199,7 +199,7 @@
                     @endif
 
                     <p class="text-secondary small mb-4">
-                        Upload a character export file (<code>.json</code>) generated from Export All or Export JSON. Accepts a single character or a full roster export.
+                        Upload a character export file (<code>.json</code>) generated from Export All or Export JSON. Accepts a single character or a full roster export. Reference images aren't included — re-add them per character afterward via Edit Identity.
                     </p>
 
                     <div class="mb-3">
