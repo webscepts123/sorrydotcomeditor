@@ -37,7 +37,7 @@
                     <div class="mb-4">
                         <label class="form-label text-secondary small tracking-widest uppercase">Wan API Workflow File</label>
                         <input type="text" name="comfyui_video_workflow" class="form-control bg-transparent border-0 border-bottom border-secondary rounded-0 text-white p-2" value="{{ old('comfyui_video_workflow', $settings['comfyui_video_workflow']) }}" required>
-                        <small class="text-secondary">Export a ComfyUI workflow in API format and use <code>{{ '{{PROMPT}}' }}</code> in its positive prompt.</small>
+                        <small class="text-secondary">Export a ComfyUI workflow in API format and use <code>@{{PROMPT}}</code> in its positive prompt.</small>
                     </div>
 
                     <div class="mb-4">
