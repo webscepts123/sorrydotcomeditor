@@ -72,11 +72,13 @@
             min-width: 210px;
             padding: 6px;
             position: absolute;
-            top: 30px;
+            /* Keep the dropdown touching its trigger so hover stays active. */
+            top: 100%;
             z-index: 500;
             border-radius: 4px;
         }
-        .nle-menu-group:hover .nle-menu-dropdown { display: block; }
+        .nle-menu-group.is-open .nle-menu-dropdown { display: block; }
+        .nle-menu-group.is-open > .nle-menu-item { color: #fff; background: var(--nle-hover); }
         .nle-menu-link {
             align-items: center;
             background: transparent;
@@ -2060,6 +2062,45 @@
 </div>
 
 <script>
+    // Keep menus open while the pointer travels from the heading to an action.
+    const editorMenuGroups = [...document.querySelectorAll('.nle-menu-group')];
+    function closeEditorMenus() {
+        editorMenuGroups.forEach(group => {
+            group.classList.remove('is-open');
+            group.querySelector('.nle-menu-item').setAttribute('aria-expanded', 'false');
+        });
+    }
+    editorMenuGroups.forEach((group, index) => {
+        const trigger = group.querySelector('.nle-menu-item');
+        const dropdown = group.querySelector('.nle-menu-dropdown');
+        dropdown.id = `editor-menu-${index}`;
+        trigger.setAttribute('aria-controls', dropdown.id);
+        trigger.setAttribute('aria-expanded', 'false');
+        const openMenu = () => {
+            closeEditorMenus();
+            group.classList.add('is-open');
+            trigger.setAttribute('aria-expanded', 'true');
+        };
+        trigger.addEventListener('pointerenter', event => {
+            if (event.pointerType !== 'touch') openMenu();
+        });
+        trigger.addEventListener('click', openMenu);
+        dropdown.addEventListener('click', event => {
+            if (event.target.closest('.nle-menu-link:not([disabled])')) closeEditorMenus();
+        });
+    });
+    document.addEventListener('click', event => {
+        if (!event.target.closest('.nle-menu-group')) closeEditorMenus();
+    });
+    document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') return;
+        const openGroup = document.querySelector('.nle-menu-group.is-open');
+        if (openGroup) {
+            closeEditorMenus();
+            openGroup.querySelector('.nle-menu-item').focus();
+        }
+    });
+
     // State
     let isPlaying = false;
     let isLooping = false;
