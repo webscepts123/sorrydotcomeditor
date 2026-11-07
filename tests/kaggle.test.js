@@ -23,6 +23,7 @@ test("Kaggle scene export uses owned scene data without exposing credentials", a
   assert.deepEqual(calls, [["scenes", "9"], ["projects", 2]]);
   assert.equal(job.format, "sorrydotcomeditor.wan-kaggle.v1");
   assert.equal(job.scene_id, 9);
+  assert.equal(job.preset, "1080p");
   assert.match(job.prompt, /A station at dawn/);
   assert.match(job.prompt, /Maya/);
   assert.match(headers["Content-Disposition"], /scene-9-wan-job.json/);

@@ -72,7 +72,7 @@ print("Libraries installed. Continue to scene settings.")
 markdown('''
 ## Scene settings
 
-Use `quick` first: a short, reduced-resolution compatibility test. After a successful render, use `480p` for a longer clip. These presets do not guarantee a completion time or that every GPU session will have enough free memory.
+The default `1080p` preset generates a 480p clip, then upscales it to a **1920×1080 MP4** with FFmpeg Lanczos scaling. This is an upscaled export, not native 1080p generation or AI detail restoration. It preserves the image proportions and pads the edges as needed. Use `quick` for a shorter compatibility test. These presets do not guarantee a completion time or that every GPU session will have enough free memory.
 
 For an exported editor scene, add its JSON as a private Kaggle input and set `JOB_FILE` to the uploaded file's path. Otherwise edit `PROMPT` and optionally `SCENE_ID` directly. The scene number makes importing the finished video easier.
 ''')
@@ -84,7 +84,7 @@ JOB_FILE = ""  # Example: /kaggle/input/my-private-scene/scene-1-wan-job.json
 SCENE_ID = None  # Replace with your editor's scene ID, if known.
 PROMPT = "A cinematic shot of a quiet railway platform at sunrise, soft golden light, a woman waits beside a vintage train, natural human movement, slow camera dolly forward."
 NEGATIVE_PROMPT = "low quality, blurry, distorted faces, extra limbs, cartoon, watermark, text, subtitles"
-PRESET = "quick"  # quick or 480p
+PRESET = "1080p"  # quick, 480p, or 1080p (480p generation + upscale)
 SEED = 42
 
 if JOB_FILE:
@@ -97,7 +97,7 @@ if JOB_FILE:
     SCENE_ID = job.get("scene_id")
     PROMPT = job.get("prompt", "")
     NEGATIVE_PROMPT = job.get("negative_prompt", NEGATIVE_PROMPT)
-    PRESET = job.get("preset", "quick")
+    PRESET = job.get("preset", "1080p")
     SEED = job.get("seed", 42)
 
 if not isinstance(PROMPT, str) or not PROMPT.strip() or len(PROMPT) > 12000:
@@ -111,10 +111,12 @@ if type(SEED) is not int or not 0 <= SEED < 2**32:
 PRESETS = {
     "quick": {"width": 480, "height": 272, "num_frames": 33, "num_inference_steps": 20},
     "480p": {"width": 832, "height": 480, "num_frames": 81, "num_inference_steps": 30},
+    "1080p": {"width": 832, "height": 480, "num_frames": 81, "num_inference_steps": 30},
 }
 if PRESET not in PRESETS:
-    raise ValueError("PRESET must be quick or 480p.")
+    raise ValueError("PRESET must be quick, 480p, or 1080p.")
 settings = PRESETS[PRESET].copy()
+UPSCALE_1080P = PRESET == "1080p"
 FPS = 16
 print(f"Scene: {SCENE_ID}; preset: {PRESET}; clip length: {settings['num_frames'] / FPS:.2f} seconds; seed: {SEED}")
 print(PROMPT)
@@ -204,12 +206,15 @@ markdown('''
 ## Save, preview, and download
 
 Both the video and a small generation manifest are saved to `/kaggle/working/wan-output`. The manifest records the scene ID and settings; it does not contain credentials. Download the MP4 before your session ends.
+
+For `1080p`, FFmpeg scales the completed 480p video on the CPU, streaming frames to avoid keeping a full 1080p clip in memory. Both the source and final export are retained. Upscaling increases pixel dimensions; it does not recover native 1080p detail.
 ''')
 code('''
 from datetime import datetime, timezone
 from IPython.display import display, FileLink, Video
 import importlib.metadata
 import numpy as np
+import imageio_ffmpeg
 
 if len(frames) != settings["num_frames"] or not np.isfinite(frames).all():
     raise RuntimeError("Invalid generated frames. No MP4 was exported.")
@@ -217,22 +222,45 @@ output_dir = Path("/kaggle/working/wan-output")
 output_dir.mkdir(parents=True, exist_ok=True)
 stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 label = f"scene-{SCENE_ID}" if SCENE_ID is not None else "preview"
-video_path = output_dir / f"{label}-wan21-{stamp}.mp4"
-export_to_video(frames, str(video_path), fps=FPS)
+source_path = output_dir / f"{label}-wan21-{stamp}-source.mp4"
+export_to_video(frames, str(source_path), fps=FPS)
+video_path = source_path
+if UPSCALE_1080P:
+    video_path = output_dir / f"{label}-wan21-{stamp}-1080p.mp4"
+    subprocess.run([
+        imageio_ffmpeg.get_ffmpeg_exe(), "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(source_path),
+        "-vf", "scale=1920:1080:force_original_aspect_ratio=decrease:flags=lanczos,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1",
+        "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart", "-an", str(video_path),
+    ], check=True)
 if not video_path.is_file() or video_path.stat().st_size == 0:
     raise RuntimeError("MP4 export failed.")
+probe = imageio_ffmpeg.read_frames(str(video_path))
+try:
+    output_metadata = next(probe)
+finally:
+    probe.close()
+if UPSCALE_1080P and tuple(output_metadata["size"]) != (1920, 1080):
+    raise RuntimeError("Export did not produce 1920x1080 video.")
 manifest = {
     "format": "sorrydotcomeditor.wan-kaggle-result.v1",
     "scene_id": SCENE_ID, "model": MODEL_ID, "preset": PRESET,
     "prompt": PROMPT, "negative_prompt": NEGATIVE_PROMPT, "seed": SEED,
     "fps": FPS, **settings, "gpu": gpu.name, "created_at": stamp,
     "video_file": video_path.name,
+    "source_file": source_path.name,
+    "output_width": output_metadata["size"][0], "output_height": output_metadata["size"][1],
+    "upscaled": UPSCALE_1080P, "upscale_method": "FFmpeg Lanczos + aspect-preserving padding" if UPSCALE_1080P else None,
     "versions": {package: importlib.metadata.version(package) for package in ["torch", "diffusers", "transformers", "accelerate"]},
 }
 video_path.with_suffix(".json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 display(Video(str(video_path), embed=True, width=640))
 display(FileLink(str(video_path.relative_to("/kaggle/working"))))
 display(FileLink(str(video_path.with_suffix(".json").relative_to("/kaggle/working"))))
+if UPSCALE_1080P:
+    print("1920x1080 upscaled export ready. The original generated clip is also available:")
+    display(FileLink(str(source_path.relative_to("/kaggle/working"))))
 print("You can also download these files from Kaggle's Output panel.")
 if SCENE_ID is not None:
     print("After downloading the MP4, run this from your local editor project:")

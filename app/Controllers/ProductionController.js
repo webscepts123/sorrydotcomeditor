@@ -1007,7 +1007,7 @@ export class ProductionController extends Controller {
     ].filter(Boolean).join("\n\n");
     if (prompt.length > 12000) return this.abort(422, "This scene prompt is too long for the Kaggle notebook. Shorten the scene or cast descriptions first.");
     this.context.response.setHeader("Content-Disposition", `attachment; filename="scene-${scene.id}-wan-job.json"`);
-    return this.text(JSON.stringify({ format: "sorrydotcomeditor.wan-kaggle.v1", scene_id: Number(scene.id), project_id: Number(scene.project_id), prompt, negative_prompt: "low quality, blurry, distorted faces, extra limbs, cartoon, watermark, text, subtitles", preset: "quick", seed: 42 }, null, 2), 200, "application/json; charset=utf-8");
+    return this.text(JSON.stringify({ format: "sorrydotcomeditor.wan-kaggle.v1", scene_id: Number(scene.id), project_id: Number(scene.project_id), prompt, negative_prompt: "low quality, blurry, distorted faces, extra limbs, cartoon, watermark, text, subtitles", preset: "1080p", seed: 42 }, null, 2), 200, "application/json; charset=utf-8");
   }
 
   async renderLocalScene() {

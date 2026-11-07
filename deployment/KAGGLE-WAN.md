@@ -15,7 +15,7 @@ If GPU selection is unavailable, check your Kaggle quota, account verification, 
 
 ## 2. Choose your scene and run
 
-In the **Scene settings** cell, edit `PROMPT`, set `SCENE_ID` to the scene number from your editor URL, and leave `PRESET = "quick"` for the first run. Run the remaining cells in order.
+In the **Scene settings** cell, edit `PROMPT` and set `SCENE_ID` to the scene number from your editor URL. The default `PRESET = "1080p"` generates at 480p and then upscales to a 1920×1080 MP4. Run the remaining cells in order. Choose `quick` if you want a shorter compatibility test first.
 
 Alternatively, use **Export this scene for Kaggle** in the editor. Add the downloaded JSON as a private notebook input, set `JOB_FILE` to its `/kaggle/input/...` path, and rerun from Scene settings. That export contains the saved scene script, visual style, and assigned cast descriptions; save changes before exporting.
 
@@ -23,6 +23,7 @@ The notebook encodes text in a separate CPU stage using FP32, releases the text 
 
 - `quick`: 480×272, 33 frames at 16 fps, 20 sampling steps; about 2 seconds, reduced quality.
 - `480p`: 832×480, 81 frames at 16 fps, 30 sampling steps; about 5 seconds.
+- `1080p` (default): generates the same 480p clip, then uses FFmpeg Lanczos scaling and aspect-preserving padding to export exactly 1920×1080. It retains the generated source. This is upscaled output, not native 1080p generation or AI detail enhancement. The manifest records generation and output dimensions separately.
 
 Model downloads are several GB. Free GPU quota, session time, throughput, available RAM, and successful inference depend on Kaggle's current session. If a run runs out of memory, restart the session and use `quick`. No cloud generation was executed from this local workspace; the notebook needs its first real GPU run in your signed-in Kaggle session.
 

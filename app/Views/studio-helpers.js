@@ -31,7 +31,7 @@ export function localWanControls(scene, csrfToken) {
 export function kaggleControls(scene) {
   return `<section class="p-2 mt-2 border border-info" data-kaggle-wan>
     <strong class="text-info small">WAN 2.1 — KAGGLE GPU</strong>
-    <p class="text-secondary small">Generate online using your Kaggle GPU quota. Save your scene prompt, download the notebook, then import it in Kaggle with Internet and GPU enabled.</p>
+    <p class="text-secondary small">Generate online using your Kaggle GPU quota. The default exports 1920×1080 by upscaling a 480p generation. Save your scene prompt, download the notebook, then import it in Kaggle with Internet and GPU enabled.</p>
     <div class="d-grid gap-2">
       <a class="nle-btn btn btn-sm btn-outline-info" href="/wan-kaggle/notebook" download>Download Kaggle notebook</a>
       <a class="nle-btn btn btn-sm btn-outline-secondary" href="/scenes/${escapeHtml(scene.id)}/kaggle-job" download>Export this scene for Kaggle</a>
