@@ -5,6 +5,7 @@ import path from "node:path";
 import { repositories } from "../Models/index.js";
 import { renderStudio } from "../Views/Studio.js";
 import { renderProductionEditor } from "../Views/ProductionEditor.js";
+import { mediaUrl } from "../Views/studio-helpers.js";
 
 const resourceDefinitions = {
   projects: {
@@ -400,7 +401,7 @@ export class ProductionController extends Controller {
           editorHref: `/projects/${row.id}/editor`,
           timelineHref: `/projects/${row.id}/timeline`,
           videoEditorHref: `/projects/${row.id}/videoeditor`,
-          posterUrl: row.poster_image ? `/public/${row.poster_image}` : ""
+          posterUrl: mediaUrl(row.poster_image)
         })),
         hasRows: rows.length > 0
       });
@@ -431,7 +432,7 @@ export class ProductionController extends Controller {
         hasProjects: projectOptions.length > 0,
         rows: rows.map((row) => ({
           ...rowForView(row, "/characters"),
-          imageUrl: row.image_path ? `/public/${row.image_path}` : ""
+          imageUrl: mediaUrl(row.image_path || row.reference_image)
         })),
         hasRows: rows.length > 0
       });
@@ -555,7 +556,7 @@ export class ProductionController extends Controller {
         message: takeFlash(this.context),
         navigation,
         pageType: "show",
-        project: { ...row, posterUrl: row.poster_image ? `/public/${row.poster_image}` : "" },
+        project: { ...row, posterUrl: mediaUrl(row.poster_image) },
         rows: scenes.map((scene) => rowForView(scene, "/scenes")),
         hasRows: scenes.length > 0,
         editHref: `/projects/${row.id}/edit`,
@@ -588,7 +589,7 @@ export class ProductionController extends Controller {
         pageType: "show",
         scene: row,
         projectTitle: projectRows[0]?.title ?? "Unknown project",
-        videoUrl: row.video_path ? `/public/${row.video_path}` : "",
+        videoUrl: mediaUrl(row.video_path),
         characters: characterRows,
         hasCharacters: characterRows.length > 0,
         editHref: `/scenes/${row.id}/edit`,
@@ -605,7 +606,7 @@ export class ProductionController extends Controller {
         message: takeFlash(this.context),
         navigation,
         pageType: "show",
-        character: { ...row, imageUrl: row.image_path ? `/public/${row.image_path}` : "" },
+        character: { ...row, imageUrl: mediaUrl(row.image_path || row.reference_image) },
         editHref: `/characters/${row.id}/edit`,
         exportHref: `/characters/${row.id}/export`,
         imageAction: `/characters/${row.id}/generate-image`,
@@ -1306,7 +1307,7 @@ export class ProductionController extends Controller {
       projects: projects.map((project) => ({
         ...rowForView(project, "/projects"),
         id: String(project.id),
-        posterUrl: project.poster_image ? `/public/${project.poster_image}` : "",
+        posterUrl: mediaUrl(project.poster_image),
         taglineId: `tagline-${project.id}`,
         directionId: `direction-${project.id}`
       })),

@@ -1,12 +1,18 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
+
 export function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 }
 
-export function mediaUrl(value) {
+export function mediaUrl(value, publicRoot = path.resolve(process.cwd(), "public")) {
   if (!value) return "";
-  const relative = String(value).replace(/^\/+/, "");
+  const relative = String(value).replace(/^\/+/, "").replace(/^public\//, "");
   if (relative.split("/").some(part => part === "..") || !/^[a-zA-Z0-9_./-]+$/.test(relative)) return "";
-  return `/public/${relative}`;
+  // Laravel stores media relative to storage/app/public; new media uses uploads/.
+  const stored = !existsSync(path.join(publicRoot, relative))
+    && existsSync(path.join(publicRoot, "storage", relative));
+  return `/public/${stored ? "storage/" : ""}${relative}`;
 }
 
 export function localWanControls(scene, csrfToken) {
