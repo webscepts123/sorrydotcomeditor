@@ -1,4 +1,40 @@
-# Deploy from GitHub with one command
+# Live studio deployment
+
+`https://studio.sorrydotcom.lk` deploys automatically when commits are pushed to
+`main` in `webscepts123/sorrydotcomeditor`. See
+`.github/workflows/deploy-cpanel.yml` and the repository's Actions tab.
+
+The workflow runs the application tests, uploads the exact commit over SSH,
+installs locked production dependencies, runs additive migrations, and starts
+the new release on a loopback port. Traffic switches only after `/health`
+passes. Failed startup leaves the previous release serving traffic. Database
+migrations are not automatically reversed; keep future migrations backward
+compatible. `workflow_dispatch` can deploy a new commit manually; an already
+existing release is rejected to avoid overwriting running files.
+
+Server layout:
+
+- `/home/studiosorrydotco/apps/sorrydotcomeditor/releases/<commit>`: application releases.
+- `current`: symlink to the active release.
+- `shared/.env`, `shared/storage`, `shared/uploads`: persistent credentials and media.
+- `shared/logs`: application logs; `shared/active-port`: the live loopback port.
+- `/home/studiosorrydotco/public_html`: PHP reverse proxy and Apache rules only.
+- `/home/studiosorrydotco/backups`: original Laravel files and database snapshot.
+
+The server uses Node.js 26 under `~/.local/node`, with its private libatomic
+runtime in `~/.local`. A cron job checks the application every minute and
+restarts it after a process exit or server reboot. GitHub repository secrets
+`CPANEL_KEY` and `CPANEL_KNOWN_HOSTS` hold the dedicated SSH key and pinned host
+key. Neither the cPanel password nor the production environment is committed.
+
+The PHP bridge and Apache rules are installed at initial cutover. Changes to
+`deployment/live-index.php` or `deployment/live.htaccess` require a deliberate
+server update; application changes deploy automatically.
+
+## Generic framework deployment script
+
+The older generic script below is retained for other installations. The live
+studio uses `live-deploy.sh` instead.
 
     bash ~/public_html/deployment/deploy.sh
 

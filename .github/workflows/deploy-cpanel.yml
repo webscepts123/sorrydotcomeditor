@@ -1,0 +1,39 @@
+name: Deploy live cPanel site
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cpanel-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - name: Prepare release
+        run: git archive --format=tar.gz -o release.tar.gz HEAD
+      - name: Deploy and check live server
+        env:
+          CPANEL_KEY: ${{ secrets.CPANEL_KEY }}
+          CPANEL_KNOWN_HOSTS: ${{ secrets.CPANEL_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$CPANEL_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$CPANEL_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          remote=studiosorrydotco@studio.sorrydotcom.lk
+          base=/home/studiosorrydotco/apps/sorrydotcomeditor
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes release.tar.gz "$remote:$base/incoming-$GITHUB_SHA.tar.gz"
+          scp -o BatchMode=yes -o StrictHostKeyChecking=yes deployment/live-deploy.sh "$remote:$base/live-deploy.sh"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$remote" "bash '$base/live-deploy.sh' '$base/incoming-$GITHUB_SHA.tar.gz' '$GITHUB_SHA'"
+          curl --fail --retry 5 --retry-delay 3 https://studio.sorrydotcom.lk/health

@@ -1,0 +1,9 @@
+Options -Indexes
+DirectoryIndex index.php
+RewriteEngine On
+RewriteRule (^|/)\. - [F,L]
+RewriteRule ^index\.php$ - [L]
+RewriteRule ^ index.php [L,QSA]
+<IfModule mime_module>
+  AddHandler application/x-httpd-ea-php83 .php
+</IfModule>
