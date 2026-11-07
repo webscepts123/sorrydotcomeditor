@@ -1,6 +1,8 @@
 Options -Indexes
 DirectoryIndex index.php
 RewriteEngine On
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://studio.sorrydotcom.lk%{REQUEST_URI} [R=301,L]
 RewriteRule (^|/)\. - [F,L]
 RewriteRule ^index\.php$ - [L]
 RewriteRule ^ index.php [L,QSA]
