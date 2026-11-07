@@ -6,6 +6,7 @@ import { repositories } from "../Models/index.js";
 import { renderStudio } from "../Views/Studio.js";
 import { renderProductionEditor } from "../Views/ProductionEditor.js";
 import { mediaUrl } from "../Views/studio-helpers.js";
+import { createNotebookTransfer, readNotebookTransfer } from "../Services/KaggleNotebookTransfer.js";
 
 const resourceDefinitions = {
   projects: {
@@ -997,18 +998,75 @@ export class ProductionController extends Controller {
   }
 
   async kaggleScene() {
+    const job = await this.kaggleJob();
+    if (!job) return;
+    this.context.response.setHeader("Cache-Control", "private, no-store");
+    this.context.response.setHeader("Content-Disposition", `attachment; filename="scene-${job.scene_id}-wan-job.json"`);
+    return this.text(JSON.stringify(job, null, 2), 200, "application/json; charset=utf-8");
+  }
+
+  async saveKagglePrompt() {
+    const scene = await this.findOwned("scenes", this.params.id);
+    const prompt = typeof this.body?.prompt === "string" ? this.body.prompt.trim() : "";
+    if (!prompt || prompt.length > 8000) return this.abort(422, "Enter a video prompt between 1 and 8000 characters.");
+    await this.models.scenes.update(scene.id, { prompt });
+    flash(this.context, "Video prompt saved. Download the scene notebook for 1080p output.");
+    return redirect(this.context, `/projects/${scene.project_id}/videoeditor?scene_id=${scene.id}`);
+  }
+
+  async kaggleSceneNotebook() {
+    const document = await this.kaggleNotebookDocument();
+    if (!document) return;
+    this.context.response.setHeader("Cache-Control", "private, no-store");
+    this.context.response.setHeader("Content-Disposition", `attachment; filename="scene-${document.sceneId}-1080p.ipynb"`);
+    return this.text(document.body, 200, "application/x-ipynb+json; charset=utf-8");
+  }
+
+  async openKaggleNotebook() {
+    const document = await this.kaggleNotebookDocument();
+    if (!document) return;
+    const token = await createNotebookTransfer(document.body);
+    const source = new URL(`/wan-kaggle/import/${token}/notebook.ipynb`, process.env.APP_URL || "http://localhost:3000");
+    this.context.response.setHeader("Cache-Control", "private, no-store");
+    this.context.response.setHeader("Referrer-Policy", "no-referrer");
+    return redirect(this.context, `https://www.kaggle.com/kernels/welcome?src=${encodeURIComponent(source.href)}`);
+  }
+
+  async kaggleNotebookImport() {
+    const notebook = await readNotebookTransfer(String(this.params.token ?? ""));
+    this.context.response.setHeader("Cache-Control", "private, no-store");
+    this.context.response.setHeader("X-Robots-Tag", "noindex, nofollow");
+    if (!notebook) return this.abort(404, "Notebook import link expired or not found. Open the scene in Kaggle again from the editor.");
+    return this.text(notebook, 200, "application/x-ipynb+json; charset=utf-8");
+  }
+
+  async kaggleNotebookDocument() {
+    const job = await this.kaggleJob();
+    if (!job) return;
+    const notebook = JSON.parse(await readFile(new URL("../../notebooks/wan21-kaggle.ipynb", import.meta.url), "utf8"));
+    const cell = notebook.cells.find(cell => cell.cell_type === "code" && cell.source.join("").includes("if JOB_FILE:"));
+    if (!cell) throw new Error("Notebook scene settings cell is missing.");
+    const encoded = Buffer.from(JSON.stringify(job), "utf8").toString("hex");
+    const settings = `editor_job = json.loads(bytes.fromhex("${encoded}").decode("utf-8"))\nSCENE_ID = editor_job["scene_id"]\nPROMPT = editor_job["prompt"]\nNEGATIVE_PROMPT = editor_job["negative_prompt"]\nPRESET = "1080p"\nSEED = editor_job["seed"]\n\n`;
+    cell.source = cell.source.join("").replace("if JOB_FILE:", `${settings}if JOB_FILE:`).split(/(?<=\n)/);
+    return { sceneId: job.scene_id, body: JSON.stringify(notebook) };
+  }
+
+  async kaggleJob() {
     const scene = await this.findOwned("scenes", this.params.id);
     const project = await this.findOwned("projects", scene.project_id);
     const characters = await this.db.query("SELECT c.name, c.role, c.description FROM characters c INNER JOIN character_scene cs ON cs.character_id = c.id WHERE cs.scene_id = ?", [scene.id]);
     const prompt = [
       project.style_preset ? `Visual style: ${project.style_preset}.` : "Cinematic live-action video.",
-      scene.script_segment,
+      scene.prompt || scene.script_segment,
       characters.length ? `Cast: ${characters.map(character => `${character.name} (${character.role || "supporting"}): ${character.description || ""}`).join("; ")}` : "",
       "Natural motion, coherent anatomy, film lighting, no subtitles or watermarks."
     ].filter(Boolean).join("\n\n");
-    if (prompt.length > 12000) return this.abort(422, "This scene prompt is too long for the Kaggle notebook. Shorten the scene or cast descriptions first.");
-    this.context.response.setHeader("Content-Disposition", `attachment; filename="scene-${scene.id}-wan-job.json"`);
-    return this.text(JSON.stringify({ format: "sorrydotcomeditor.wan-kaggle.v1", scene_id: Number(scene.id), project_id: Number(scene.project_id), prompt, negative_prompt: "low quality, blurry, distorted faces, extra limbs, cartoon, watermark, text, subtitles", preset: "1080p", seed: 42 }, null, 2), 200, "application/json; charset=utf-8");
+    if (prompt.length > 12000) {
+      this.abort(422, "This scene prompt is too long for the Kaggle notebook. Shorten the scene or cast descriptions first.");
+      return null;
+    }
+    return { format: "sorrydotcomeditor.wan-kaggle.v1", scene_id: Number(scene.id), project_id: Number(scene.project_id), prompt, negative_prompt: "low quality, blurry, distorted faces, extra limbs, cartoon, watermark, text, subtitles", preset: "1080p", seed: 42 };
   }
 
   async renderLocalScene() {
@@ -1407,6 +1465,10 @@ export function registerProductionRoutes(app) {
   app.get("/wan-local/status", ProductionController.handle("localWanStatus"));
   app.get("/wan-kaggle/notebook", ProductionController.handle("kaggleNotebook"));
   app.get("/scenes/:id/kaggle-job", ProductionController.handle("kaggleScene"));
+  app.post("/scenes/:id/kaggle-prompt", ProductionController.handle("saveKagglePrompt"));
+  app.get("/scenes/:id/kaggle-notebook", ProductionController.handle("kaggleSceneNotebook"));
+  app.get("/scenes/:id/kaggle-open", ProductionController.handle("openKaggleNotebook"));
+  app.get("/wan-kaggle/import/:token/notebook.ipynb", ProductionController.handle("kaggleNotebookImport"));
   app.get("/characters/export", ProductionController.handle("exportCharacters"));
   app.post("/characters/generate-details", ProductionController.handle("generateCharacterDetails"));
   app.post("/characters/import", ProductionController.handle("importCharacters"));
@@ -1473,6 +1535,7 @@ export function registerProductionRoutes(app) {
 export function requireAuthentication(context, next) {
   const path = new URL(context.request.url, "http://localhost").pathname;
   if (["/login", "/setup", "/health"].includes(path)) return next();
+  if (/^\/wan-kaggle\/import\/\d{13}-[a-f0-9]{64}\/notebook\.ipynb$/.test(path)) return next();
   if (!context.session?.userId) {
     context.response.setHeader("Location", "/login");
     return context.text("", 303);

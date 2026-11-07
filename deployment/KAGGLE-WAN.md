@@ -15,7 +15,11 @@ If GPU selection is unavailable, check your Kaggle quota, account verification, 
 
 ## 2. Choose your scene and run
 
-In the **Scene settings** cell, edit `PROMPT` and set `SCENE_ID` to the scene number from your editor URL. The default `PRESET = "1080p"` generates at 480p and then upscales to a 1920×1080 MP4. Run the remaining cells in order. Choose `quick` if you want a shorter compatibility test first.
+In the editor's **AI Engine → Kaggle** panel, enter your **Video prompt** and click **Save video prompt**. Describe the subject, action, setting, camera movement, and lighting. Click **Open scene in Kaggle · 1080p** to open Kaggle directly with your saved prompt and scene ID included. Sign in, enable GPU and Internet, and run the cells in order. Download the final `-1080p.mp4`, rather than the lower-resolution source file. **Download notebook instead** remains available as a fallback.
+
+Direct opening uses Kaggle's `kernels/welcome?src=` notebook import. A random private import link allows Kaggle to fetch the notebook without your editor session and expires after 15 minutes. Expired snapshots are removed when a new transfer is created. The link contains only the exported notebook, not database credentials. Keep the imported Kaggle notebook private. If sign-in takes too long, open the scene in Kaggle again from the editor. This opens a notebook; running inference still requires your Kaggle session and GPU quota.
+
+The scene notebook uses `PRESET = "1080p"`, generating at 480p and then upscaling to a verified 1920×1080 MP4. This is not native 1080p generation. The generic notebook still lets you edit `PROMPT` and `SCENE_ID` in **Scene settings** or choose `quick` for a shorter compatibility test.
 
 Alternatively, use **Export this scene for Kaggle** in the editor. Add the downloaded JSON as a private notebook input, set `JOB_FILE` to its `/kaggle/input/...` path, and rerun from Scene settings. That export contains the saved scene script, visual style, and assigned cast descriptions; save changes before exporting.
 

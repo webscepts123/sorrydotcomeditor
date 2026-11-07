@@ -5,6 +5,72 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { importKaggleVideo } from "../app/Services/KaggleVideoImport.js";
 import { ProductionController } from "../app/Controllers/ProductionController.js";
+import { kaggleControls } from "../app/Views/studio-helpers.js";
+import { createNotebookTransfer, readNotebookTransfer } from "../app/Services/KaggleNotebookTransfer.js";
+
+test("private Kaggle import snapshots expire and reject guessed or traversal paths", async t => {
+  const root = await mkdtemp(path.join(tmpdir(), "kaggle-transfer-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const now = 1800000000000;
+  const notebook = JSON.stringify({ nbformat: 4, cells: [] });
+  const token = await createNotebookTransfer(notebook, root, now);
+  assert.equal(await readNotebookTransfer(token, root, now), notebook);
+  assert.equal(await readNotebookTransfer(token, root, now + 15 * 60 * 1000), null);
+  assert.equal(await readNotebookTransfer("../../.env", root, now), null);
+  assert.equal(await readNotebookTransfer(`${now + 1000}-${"0".repeat(64)}`, root, now), null);
+  await createNotebookTransfer(notebook, root, now + 15 * 60 * 1000);
+  assert.ok(!(await readdir(root)).includes(`${token}.ipynb`));
+});
+
+test("scene notebook includes the saved prompt safely and selects 1080p", async () => {
+  const prompt = 'Close-up of a dancer. "Golden light"; </textarea><script>alert(1)</script>\nSlow dolly.';
+  const headers = {};
+  const controller = new ProductionController({
+    params: { id: "9" }, response: { setHeader: (key, value) => { headers[key] = value; } },
+    service: () => ({ query: async () => [] }), text: body => body,
+  });
+  controller.findOwned = async table => table === "scenes"
+    ? { id: 9, project_id: 2, prompt, script_segment: "Old script" }
+    : { id: 2, style_preset: "Film" };
+  const notebook = JSON.parse(await controller.kaggleSceneNotebook());
+  const source = notebook.cells.filter(cell => cell.cell_type === "code").map(cell => cell.source.join("")).join("\n");
+  const encoded = source.match(/bytes.fromhex\("([a-f0-9]+)"\)/)[1];
+  const job = JSON.parse(Buffer.from(encoded, "hex").toString("utf8"));
+  assert.ok(job.prompt.includes(prompt));
+  assert.ok(!job.prompt.includes("Old script"));
+  assert.equal(job.preset, "1080p");
+  assert.equal(job.scene_id, 9);
+  assert.match(source, /PRESET = "1080p"/);
+  assert.match(source, /Export did not produce 1920x1080 video/);
+  assert.match(headers["Content-Disposition"], /scene-9-1080p.ipynb/);
+  assert.equal(headers["Cache-Control"], "private, no-store");
+  const html = kaggleControls({ id: 9, prompt }, "csrf-example");
+  assert.ok(!html.includes("<script>alert"));
+  assert.match(html, /name="_csrf" value="csrf-example"/);
+  assert.match(html, /Save video prompt/);
+  assert.match(html, /\/scenes\/9\/kaggle-notebook/);
+  controller.findOwned = async () => { throw new Error("404 Scene not found"); };
+  await assert.rejects(() => controller.kaggleSceneNotebook(), /404/);
+});
+
+test("saving a Kaggle prompt preserves the scene script and checks ownership", async () => {
+  const writes = [];
+  const headers = {};
+  const controller = new ProductionController({
+    params: { id: "9" }, body: { prompt: "  Slow camera move at sunrise.  " }, session: {},
+    service: () => ({ query: async (sql, values) => { writes.push({ sql, values }); return {}; } }),
+    response: { setHeader: (key, value) => { headers[key] = value; } }, text: (_body, status) => status,
+  });
+  controller.findOwned = async () => ({ id: 9, project_id: 2 });
+  assert.equal(await controller.saveKagglePrompt(), 303);
+  assert.match(writes[0].sql, /UPDATE scenes SET prompt/);
+  assert.doesNotMatch(writes[0].sql, /script_segment/);
+  assert.ok(writes[0].values.includes("Slow camera move at sunrise."));
+  assert.equal(headers.Location, "/projects/2/videoeditor?scene_id=9");
+  controller.findOwned = async () => { throw new Error("404 Scene not found"); };
+  await assert.rejects(() => controller.saveKagglePrompt(), /404/);
+  assert.equal(writes.filter(write => write.sql.startsWith("UPDATE")).length, 1);
+});
 
 test("Kaggle scene export uses owned scene data without exposing credentials", async () => {
   const calls = [];
