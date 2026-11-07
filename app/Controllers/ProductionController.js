@@ -997,6 +997,44 @@ export class ProductionController extends Controller {
     return this.text(notebook, 200, "application/x-ipynb+json; charset=utf-8");
   }
 
+  async kaggleConnection() {
+    this.context.response.setHeader("Cache-Control", "private, no-store");
+    try { return this.json(await this.service("kaggle").connection(this.context.session.userId)); }
+    catch (error) { return this.json({ connected: false, available: false, message: error.message }, 503); }
+  }
+
+  async connectKaggle() {
+    this.context.response.setHeader("Cache-Control", "private, no-store");
+    try { return this.json(await this.service("kaggle").connect(this.context.session.userId, this.body)); }
+    catch (error) { return this.json({ message: error.message }, 422); }
+  }
+
+  async disconnectKaggle() {
+    await this.service("kaggle").disconnect(this.context.session.userId);
+    return this.json({ connected: false });
+  }
+
+  async renderKaggleScene() {
+    const scene = await this.findOwned("scenes", this.params.id);
+    if (["Rendering", "Processing"].includes(scene.status)) return this.json({ message: "This scene already has a running generation job." }, 409);
+    const prompt = typeof this.body?.prompt === "string" ? this.body.prompt.trim() : "";
+    if (!prompt || prompt.length > 8000) return this.json({ message: "Enter a video prompt between 1 and 8000 characters." }, 422);
+    await this.models.scenes.update(scene.id, { prompt });
+    const notebook = await this.kaggleNotebookDocument();
+    if (!notebook) return;
+    try { return this.json(await this.service("kaggle").submit(this.context.session.userId, scene, notebook.body), 202); }
+    catch (error) { return this.json({ message: error.message }, 503); }
+  }
+
+  async kaggleSceneProgress() {
+    const scene = await this.findOwned("scenes", this.params.id);
+    this.context.response.setHeader("Cache-Control", "private, no-store");
+    if (!String(scene.generation_job_id || "").startsWith("kaggle:")) return this.json({ status: scene.status, video_path: mediaUrl(scene.video_path), ready: Boolean(scene.video_path) });
+    if (scene.status === "failed") return this.json({ status: "failed", message: scene.generation_error, notebook_url: `https://www.kaggle.com/code/${scene.generation_job_id.slice(7)}` });
+    try { return this.json(await this.service("kaggle").sync(this.context.session.userId, scene)); }
+    catch (error) { return this.json({ message: error.message, pending: true }, 502); }
+  }
+
   async kaggleScene() {
     const job = await this.kaggleJob();
     if (!job) return;
@@ -1464,6 +1502,11 @@ export function registerProductionRoutes(app) {
   app.get("/dashboard/runpod-status", ProductionController.handle("runPodStatus"));
   app.get("/wan-local/status", ProductionController.handle("localWanStatus"));
   app.get("/wan-kaggle/notebook", ProductionController.handle("kaggleNotebook"));
+  app.get("/wan-kaggle/connection", ProductionController.handle("kaggleConnection"));
+  app.post("/wan-kaggle/connect", ProductionController.handle("connectKaggle"));
+  app.post("/wan-kaggle/disconnect", ProductionController.handle("disconnectKaggle"));
+  app.post("/scenes/:id/render-kaggle", ProductionController.handle("renderKaggleScene"));
+  app.post("/scenes/:id/kaggle-progress", ProductionController.handle("kaggleSceneProgress"));
   app.get("/scenes/:id/kaggle-job", ProductionController.handle("kaggleScene"));
   app.post("/scenes/:id/kaggle-prompt", ProductionController.handle("saveKagglePrompt"));
   app.get("/scenes/:id/kaggle-notebook", ProductionController.handle("kaggleSceneNotebook"));

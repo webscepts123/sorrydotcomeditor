@@ -38,6 +38,8 @@ public/generated/
 platforms/mobile/www/
 platforms/mobile/*/www/
 storage/mobile-ui/
+storage/kaggle-api/
+storage/kaggle-notebooks/
 platforms/native/
 platforms/desktop/www/
 platforms/desktop/node_modules/
@@ -53,6 +55,7 @@ out/
 tmp/
 temp/
 .cache/
+__pycache__/
 *.tmp
 *.temp
 *.tsbuildinfo

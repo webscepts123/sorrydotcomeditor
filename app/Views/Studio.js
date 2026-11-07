@@ -1631,5 +1631,5 @@ output += "\n";
 output += "<script src=\"/public/studio/bootstrap.bundle.min.js\"></script>\n";
 output += "</body>\n";
 output += "</html>\n";
-return output.replace('</head>', '<script src="/public/studio/interaction.js" defer></script>').replace('</head>', '<script src="/public/studio/local-wan.js" defer></script></head>');
+return output.replace('</head>', '<script src="/public/studio/interaction.js" defer></script><script src="/public/studio/local-wan.js" defer></script><script src="/public/studio/kaggle.js" defer></script></head>');
 }

@@ -22,6 +22,7 @@ ln -s "$BASE/shared/storage/app/public" "$RELEASE/public/storage"
 cd "$RELEASE"
 npm ci --omit=dev --no-audit --no-fund
 npm run migrate
+bash deployment/setup-kaggle.sh || echo 'Kaggle setup unavailable; the editor will show the connection error.'
 OLD_PORT="$(cat "$BASE/shared/active-port" 2>/dev/null || echo 3102)"
 PORT=3101
 [[ "$OLD_PORT" != 3101 ]] || PORT=3102

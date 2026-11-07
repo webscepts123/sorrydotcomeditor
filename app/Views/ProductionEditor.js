@@ -203,5 +203,5 @@ output += "\n";
 output += "<script src=\"/public/studio/editor.js\" defer></script>\n";
 output += "\n";
 output += "<script src=\"/public/studio/bootstrap.bundle.min.js\"></script></body></html>";
-return output.replace('</head>', '<script src="/public/studio/local-wan.js" defer></script></head>');
+return output.replace('</head>', '<script src="/public/studio/local-wan.js" defer></script><script src="/public/studio/kaggle.js" defer></script></head>');
 }

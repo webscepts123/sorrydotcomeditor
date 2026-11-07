@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { registerProductionRoutes, requireAuthentication } from "./app/Controllers/ProductionController.js";
 import { ComfyVideoService } from "./app/Services/ComfyVideoService.js";
 import { LocalWanService } from "./app/Services/LocalWanService.js";
+import { KaggleApiService } from "./app/Services/KaggleApiService.js";
 
 loadEnvironment();
 const { default: config } = await import("./noderyx.config.js");
@@ -28,6 +29,9 @@ app.provide("ai", ai(config.ai));
 app.provide("db", database);
 app.provide("comfy", () => new ComfyVideoService());
 app.provide("comfyLocal", () => new LocalWanService());
+const kaggle = new KaggleApiService({ database });
+app.provide("kaggle", kaggle);
+kaggle.start();
 
 app.use(requireAuthentication);
 registerProductionRoutes(app);
