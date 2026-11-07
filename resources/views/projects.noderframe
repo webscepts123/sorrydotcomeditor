@@ -1,0 +1,143 @@
+html lang="en"
+  head
+    meta charset="utf-8"
+    meta name="viewport" content="width=device-width, initial-scale=1"
+    title "{{title}} — Production Hub"
+    link rel="stylesheet" href="/public/app.css"
+    script src="/public/navigation.js" defer="defer"
+  body
+    div.app-shell
+      nav.side-nav
+        h2.brand "VOID"
+          span.brand-mark "S"
+        for item in navigation
+          if item.submenu
+            div.nav-group
+              div.nav-group-heading
+                if item.href
+                  a.nav-link href="{{item.href}}" "{{item.label}}"
+                else
+                  span.nav-group-label "{{item.label}}"
+                button.nav-toggle type="button" aria-expanded="true" aria-controls="{{item.id}}" aria-label="Toggle {{item.label}} submenu" "+"
+              div.nav-submenu id="{{item.id}}"
+                for link in item.links
+                  a.submenu-link href="{{link.href}}" "{{link.label}}"
+          else
+            a.nav-link href="{{item.href}}" "{{item.label}}"
+        form method="post" action="/logout"
+          button.nav-logout type="submit" "Logout"
+      main.content
+        div.topbar
+          p "SYSTEM STATUS: ACTIVE"
+          form method="get" action="/scenes/create"
+            button.secondary type="submit" "NEW CLIP +"
+        p.eyebrow "PRODUCTION HUB / PROJECTS"
+        div.page-heading
+          h1 "{{title}}"
+          if pageType == "index"
+            a.primary-link href="{{createHref}}" "Initialize project"
+          if pageType == "show"
+            a.primary-link href="{{timelineHref}}" "Open timeline"
+        if message
+          p.notice "{{message}}"
+        if pageType == "index"
+          p.muted "Manage productions, open the editor, and continue a project timeline."
+          if hasRows
+            div.project-grid
+              for project in projects
+                article.record-card
+                  if project.posterUrl
+                    img.project-poster src="{{project.posterUrl}}" alt="Project poster"
+                  a.record-title href="{{project.href}}" "{{project.title}}"
+                  p.muted "{{project.summary}}"
+                  span.status "{{project.status}}"
+                  div.action-row
+                    a.nav-link href="{{project.href}}" "Production overview"
+                    a.nav-link href="{{project.editorHref}}" "Editor"
+                    a.nav-link href="{{project.timelineHref}}" "Timeline"
+                    a.nav-link href="{{project.videoEditorHref}}" "Video editor"
+          else
+            article.record-card
+              h2 "No productions yet"
+              p.muted "Start with a project title, visual style, and production logline."
+              a.primary-link href="{{createHref}}" "Initialize first project"
+        if pageType == "form"
+          form.form-card method="post" action="{{formAction}}"
+            for field in fields
+              label for="{{field.name}}" "{{field.label}}"
+              if field.multiline
+                textarea id="{{field.name}}" name="{{field.name}}" rows="5" "{{field.value}}"
+              else if field.type == "select"
+                select id="{{field.name}}" name="{{field.name}}"
+                  for option in field.options
+                    if option.selected
+                      option value="{{option.value}}" selected="selected" "{{option.label}}"
+                    else
+                      option value="{{option.value}}" "{{option.label}}"
+              else
+                input id="{{field.name}}" type="{{field.type}}" name="{{field.name}}" value="{{field.value}}"
+            button.primary type="submit" "{{submitLabel}}"
+          a.nav-link href="/projects" "Cancel"
+        if pageType == "show"
+          article.record-card
+            h2 "{{project.title}}"
+            p.muted "{{project.description}}"
+            p.status "{{project.status}}"
+            p "Aspect ratio: {{project.aspect_ratio}}"
+            p "Resolution: {{project.resolution}}"
+            p "Style: {{project.style_preset}}"
+            if project.posterUrl
+              img.project-poster src="{{project.posterUrl}}" alt="Generated project poster"
+            div.action-row
+              a.primary-link href="{{editHref}}" "Edit production"
+              a.nav-link href="{{timelineHref}}" "Open timeline"
+              a.nav-link href="{{videoEditorHref}}" "Open video editor"
+              a.nav-link href="{{editorHref}}" "Open scene editor"
+              a.nav-link href="{{xmlHref}}" "Export scene XML"
+          div.action-row
+            form method="post" action="{{renderAction}}"
+              button.primary type="submit" "Batch render scenes"
+            form method="post" action="{{posterAction}}"
+              button.secondary type="submit" "Generate poster"
+            a.nav-link href="{{downloadHref}}" "Download completed movie"
+            form method="post" action="{{deleteAction}}"
+              button.danger type="submit" "Delete production"
+          if hasEditors
+            form.form-card method="post" action="{{editorAssignAction}}"
+              label for="editor_id" "Assign editor"
+              select id="editor_id" name="editor_id"
+                for editor in editors
+                  option value="{{editor.value}}" "{{editor.label}}"
+              label for="assigned_task" "Assignment"
+              input id="assigned_task" type="text" name="assigned_task" value="Production editing"
+              button.secondary type="submit" "Assign editor"
+          div.page-heading
+            h2 "Production scenes"
+            a.primary-link href="{{sceneCreateHref}}" "Add scene"
+          if hasRows
+            for row in rows
+              article.record-card
+                a.record-title href="{{row.href}}" "{{row.title}}"
+                p.muted "{{row.summary}}"
+                span.status "{{row.status}}"
+          else
+            p.muted "No scenes have been added to this production."
+        if pageType == "workspace"
+          div.action-row
+            a.primary-link href="{{projectHref}}" "Production overview"
+            a.nav-link href="{{sceneCreateHref}}" "Add scene"
+            a.nav-link href="{{xmlHref}}" "Export scene XML"
+            form method="post" action="{{renderAction}}"
+              button.primary type="submit" "Batch render"
+          if hasRows
+            for row in rows
+              article.record-card
+                a.record-title href="{{row.href}}" "{{row.title}}"
+                p.muted "{{row.summary}}"
+                span.status "{{row.status}}"
+                a.nav-link href="{{row.href}}" "Edit scene and cast"
+          else
+            article.record-card
+              h2 "Timeline is empty"
+              p.muted "Create the first scene to begin building the production sequence."
+              a.primary-link href="{{sceneCreateHref}}" "Add the first scene"

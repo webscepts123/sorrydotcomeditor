@@ -1,59 +1,48 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# sorrydotcomeditor
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+The production editor runs on Noderyx Framework 0.9. The Node.js server uses `.noderframe` views, MySQL, signed sessions, and CSRF-protected forms. The original video editor Blade view is retained as a conversion reference; it is not served by Noderyx.
 
-## About Laravel
+## Requirements
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Node.js 26 or newer
+- npm
+- MySQL or MariaDB
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Run locally
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+```powershell
+Copy-Item .env.example .env
+npm.cmd install
+npm.cmd run db:create
+npm.cmd run migrate
+npm.cmd run dev
+```
 
-## Learning Laravel
+Configure database credentials in `.env` before migrating. On a new database, create the first administrator from the one-time setup page. Existing Laravel bcrypt password hashes remain usable. Set a strong, private `APP_KEY` before deploying. Never commit `.env` or provider credentials.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+AI story and character tools use the optional Noderyx AI configuration. Image generation requires `OPENAI_API_KEY`. Scene video generation can use `SEEDANCE_API_KEY` and `SEEDANCE_BASE_URL`; ComfyUI rendering needs `COMFYUI_URL` and a ComfyUI API-format workflow at `COMFYUI_VIDEO_WORKFLOW`. Configure provider services before using their respective actions.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+The dashboard checks the configured ComfyUI worker every five seconds and shows available GPU, memory, and queue metrics. Storage usage refers to the filesystem hosting the application, not the remote worker. The timeline percentage is an estimate based on 15 minutes per scene and a 150-minute target.
 
-## Laravel Sponsors
+Noderyx screens cover projects, scenes and timelines, cast identities, the video-editor preview, production planning, posters, settings, and production tools. Video-editor adjustments currently affect only the browser preview; they do not modify rendered video files. Audio-score generation and multipart file uploads are not yet connected.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Open Video editor from the sidebar (the most recently updated project), a project card, or the dashboard. Select a scene in the media list or timeline; rendered clips can be played and adjusted in the browser. The Edit, Color, Fairlight, and Deliver panels currently provide preview transforms, color controls, embedded-audio volume, and original clip/XML downloads. The original editor's transitions, audio mixing, and other advanced features are not yet ported. Frame stepping assumes 30 frames per second. Adjustments are not saved and are not included in the scene XML export.
 
-### Premium Partners
+## Useful commands
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```powershell
+npm.cmd start
+npm.cmd run qa
+npm.cmd run build
+npm.cmd test
+```
 
-## Contributing
+Run `npm.cmd run seed` to add three sample projects and related production records for checking the editor. Repeating the command preserves existing demo projects. Samples belong to the first existing user; if no account exists, complete `/setup` to claim them. Media records contain briefs only, without generated files.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+The application entry point is `server.js`; runtime settings are in `noderyx.config.js`, controllers are in `app/Controllers/`, repositories are in `app/Models/`, migrations are in `database/migrations/`, and views are in `resources/views/`.
 
-## Code of Conduct
+The original VOID SHADOW production editor (`/projects/:id/editor`) and full-screen NLE studio (`/projects/:id/videoeditor`) use the escaped HTML renderers in `app/Views/` and local styles, scripts, fonts, and Bootstrap assets in `public/studio/`. Both `scene_id` and the original `active_scene` query parameter select a scene. Scene prompts save to the database; visual adjustments are monitor previews and are not baked into downloads. Rendering requires the configured generation provider.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+An additional local Wan 2.1 provider is available in the AI Engine inspector and production editor. See [local Wan setup](deployment/LOCAL-WAN.md) for the D: installation, hardware limitations, startup, and result import.
 
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+For a cloud GPU workflow, import [the Wan Kaggle notebook](notebooks/wan21-kaggle.ipynb) into your signed-in Kaggle account. The editor's AI Engine panel provides notebook and scene-JSON downloads. After generating and downloading an MP4, use `npm.cmd run kaggle:import -- --scene 1 --file "path/to/video.mp4"` to attach it to a scene. See [Kaggle setup](deployment/KAGGLE-WAN.md) for the steps and session requirements.

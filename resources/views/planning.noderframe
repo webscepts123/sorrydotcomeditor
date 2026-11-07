@@ -1,0 +1,73 @@
+html lang="en"
+  head
+    meta charset="utf-8"
+    meta name="viewport" content="width=device-width, initial-scale=1"
+    title "Story and Schedule — Production Hub"
+    link rel="stylesheet" href="/public/app.css"
+    script src="/public/navigation.js" defer="defer"
+  body
+    div.app-shell
+      nav.side-nav
+        h2.brand "VOID"
+          span.brand-mark "S"
+        for item in navigation
+          if item.submenu
+            div.nav-group
+              div.nav-group-heading
+                if item.href
+                  a.nav-link href="{{item.href}}" "{{item.label}}"
+                else
+                  span.nav-group-label "{{item.label}}"
+                button.nav-toggle type="button" aria-expanded="true" aria-controls="{{item.id}}" aria-label="Toggle {{item.label}} submenu" "+"
+              div.nav-submenu id="{{item.id}}"
+                for link in item.links
+                  a.submenu-link href="{{link.href}}" "{{link.label}}"
+          else
+            a.nav-link href="{{item.href}}" "{{item.label}}"
+        form method="post" action="/logout"
+          button.nav-logout type="submit" "Logout"
+      main.content
+        div.topbar
+          p "SYSTEM STATUS: ACTIVE"
+          form method="get" action="/scenes/create"
+            button.secondary type="submit" "NEW CLIP +"
+        p.eyebrow "PRODUCTION HUB / STORY AND SCHEDULE"
+        div.page-heading
+          h1 "Story and Schedule"
+          a.primary-link href="{{createHref}}" "New project"
+        if message
+          p.notice "{{message}}"
+        if pageType == "index"
+          p.muted "Select a production to write its story, scene breakdown, and schedule."
+          if hasRows
+            for project in projects
+              article.record-card
+                a.record-title href="{{project.planningHref}}" "{{project.title}}"
+                p.muted "{{project.description}}"
+                a.nav-link href="{{project.timelineHref}}" "Open timeline"
+          else
+            article.record-card
+              h2 "Create a production plan"
+              p.muted "Start with a project before drafting its production schedule."
+        if pageType == "form"
+          form.form-card method="post" action="/planning"
+            label for="project_id" "Planning project"
+            select id="project_id" name="project_id"
+              for option in projectOptions
+                if option.selected
+                  option value="{{option.value}}" selected="selected" "{{option.label}}"
+                else
+                  option value="{{option.value}}" "{{option.label}}"
+            for field in fields
+              label for="{{field.name}}" "{{field.label}}"
+              if field.multiline
+                textarea id="{{field.name}}" name="{{field.name}}" rows="5" "{{field.value}}"
+              else
+                input id="{{field.name}}" type="{{field.type}}" name="{{field.name}}" value="{{field.value}}"
+            button.primary type="submit" "Save planning"
+          form.form-card method="post" action="/planning/generate-story"
+            input type="hidden" name="project_id" value="{{selectedProjectId}}"
+            label for="logline" "Logline or story premise"
+            textarea id="logline" name="logline" rows="3" "{{logline}}"
+            button.secondary type="submit" "Generate story with AI"
+          a.nav-link href="/planning" "All project plans"

@@ -1,0 +1,11 @@
+{
+  "files.exclude": {
+    "**/node_modules": true,
+    "platforms/mobile/www": true,
+    "platforms/native": true,
+    "platforms/desktop/www": true,
+    "platforms/desktop/node_modules": true,
+    "public/generated": true
+  },
+  "python.terminal.useEnvFile": true
+}

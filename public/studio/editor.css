@@ -1,0 +1,17 @@
+
+    html, body { margin: 0; background: #000; color: #fff; font-family: 'Inter', sans-serif; }
+    @media (min-width: 768px) {
+        .container-fluid > .row { overflow: hidden; }
+        .container-fluid > .row > [class*="col-md-"] { height: 100%; overflow-y: auto; }
+    }
+    @media (max-width: 767px) {
+        .container-fluid > .row { height: auto !important; }
+        .container-fluid > .d-flex { flex-wrap: wrap; gap: 12px; }
+    }
+    .transition-hover:hover { border-color: #555 !important; background: #050505 !important; }
+    .uppercase { text-transform: uppercase; }
+    .italic { font-style: italic; }
+    .tracking-widest { letter-spacing: 0.15em; }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-thumb { background: #333; }
+    .dropdown-item:hover { background-color: #fff !important; color: #000 !important; }

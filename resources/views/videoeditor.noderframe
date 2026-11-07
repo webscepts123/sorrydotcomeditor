@@ -1,0 +1,163 @@
+html lang="en"
+  head
+    meta charset="utf-8"
+    meta name="viewport" content="width=device-width, initial-scale=1"
+    title "{{title}} — Video Editor"
+    link rel="stylesheet" href="/public/app.css"
+    script src="/public/navigation.js" defer="defer"
+    script src="/public/video-editor.js" defer="defer"
+  body
+    div.app-shell
+      nav.side-nav
+        h2.brand "VOID"
+          span.brand-mark "S"
+        for item in navigation
+          if item.submenu
+            div.nav-group
+              div.nav-group-heading
+                if item.href
+                  a.nav-link href="{{item.href}}" "{{item.label}}"
+                else
+                  span.nav-group-label "{{item.label}}"
+                button.nav-toggle type="button" aria-expanded="true" aria-controls="{{item.id}}" aria-label="Toggle {{item.label}} submenu" "+"
+              div.nav-submenu id="{{item.id}}"
+                for link in item.links
+                  a.submenu-link href="{{link.href}}" "{{link.label}}"
+          else
+            a.nav-link href="{{item.href}}" "{{item.label}}"
+        form method="post" action="/logout"
+          button.nav-logout type="submit" "Logout"
+      main.content
+        div.topbar
+          p "SYSTEM STATUS: ACTIVE"
+          form method="get" action="/scenes/create"
+            button.secondary type="submit" "NEW CLIP +"
+        p.eyebrow "VOID SHADOW / NLE STUDIO"
+        div.editor-header
+          div
+            h1 "{{title}}"
+            p.muted "VIDEO EDITOR"
+          div.action-row
+            a.secondary href="{{timelineHref}}" "Timeline"
+            a.secondary href="{{xmlHref}}" "Export scene XML"
+            a.secondary href="{{projectHref}}" "Exit studio"
+        if message
+          p.notice "{{message}}"
+        p.editor-notice "Preview only: adjustments are not saved and do not change exported video."
+        div.editor-workspaces aria-label="Editor workspaces"
+          button.secondary type="button" data-workspace-button="edit" aria-pressed="true" "Edit"
+          button.secondary type="button" data-workspace-button="color" aria-pressed="false" "Color"
+          button.secondary type="button" data-workspace-button="fairlight" aria-pressed="false" "Fairlight audio"
+          button.secondary type="button" data-workspace-button="deliver" aria-pressed="false" "Deliver"
+        div.nle-workspace
+          section.nle-panel.nle-media
+            h2.nle-panel-heading "MEDIA / SCENES"
+            if hasRows
+              for row in rows
+                if row.selected
+                  a.nle-scene.selected href="{{row.videoEditorHref}}" aria-current="true"
+                    strong "{{row.title}}"
+                    span "{{row.status}} / {{row.clipLabel}}"
+                else
+                  a.nle-scene href="{{row.videoEditorHref}}"
+                    strong "{{row.title}}"
+                    span "{{row.status}} / {{row.clipLabel}}"
+            else
+              p.muted "No scenes yet."
+              a.secondary href="{{timelineHref}}" "Open timeline"
+          section.nle-panel.nle-monitor
+            h2.nle-panel-heading "PROGRAM MONITOR"
+            div#editor-preview data-video-url="{{selectedVideoUrl}}"
+              div#video-mount
+                if hasVideo
+                  p.editor-empty "Loading video preview..."
+                else
+                  div.editor-empty
+                    p "No rendered clip selected"
+                    p.muted "Render a scene from the project timeline to preview it here."
+              h2.preview-headline data-editor-output="headline" ""
+              p.preview-subtitle data-editor-output="subtitle" ""
+            p#editor-message.muted aria-live="polite" "{{selectedSceneTitle}}"
+            if hasVideo
+              div.editor-transport
+                button.secondary type="button" data-editor-action="start" "Start"
+                button.secondary type="button" data-editor-action="back" "Step back"
+                button.secondary type="button" data-editor-action="play" "Play / Pause"
+                button.secondary type="button" data-editor-action="forward" "Step forward"
+                label for="playback-speed" "Speed"
+                select#playback-speed
+                  option value="0.5" "0.5x"
+                  option value="1" selected="selected" "1x"
+                  option value="1.5" "1.5x"
+                  option value="2" "2x"
+          section.nle-panel.nle-inspector
+            div.nle-inspector-content data-workspace-panel="edit"
+              h2.nle-panel-heading "INSPECTOR / TRANSFORM"
+              label for="scale" "Scale / zoom"
+              input#scale type="range" min="50" max="250" value="100" data-editor-control="scale"
+              label for="position-x" "Position X"
+              input#position-x type="range" min="-100" max="100" value="0" data-editor-control="x"
+              label for="position-y" "Position Y"
+              input#position-y type="range" min="-100" max="100" value="0" data-editor-control="y"
+              label for="rotation" "Rotation angle"
+              input#rotation type="range" min="-180" max="180" value="0" data-editor-control="rotation"
+              label for="opacity" "Opacity"
+              input#opacity type="range" min="0" max="100" value="100" data-editor-control="opacity"
+              h2.nle-panel-heading "CINEMATIC LOOK / TITLES"
+              label for="grain" "Film grain overlay"
+              input#grain type="range" min="0" max="100" value="0" data-editor-control="grain"
+              label for="vignette" "Vignette edge falloff"
+              input#vignette type="range" min="0" max="100" value="0" data-editor-control="vignette"
+              label for="halation" "Optical halation"
+              input#halation type="range" min="0" max="100" value="0" data-editor-control="halation"
+              label for="headline" "Headline text"
+              input#headline type="text" value="" data-editor-control="headline"
+              label for="subtitle" "Subtitle / character line"
+              input#subtitle type="text" value="" data-editor-control="subtitle"
+              button.secondary type="button" data-editor-reset="true" "Reset preview"
+              if hasScene
+                h2.nle-panel-heading "AI RENDER"
+                form method="post" action="{{renderAction}}"
+                  button.secondary type="submit" "Render selected scene"
+                form method="post" action="{{batchRenderAction}}"
+                  button.secondary type="submit" "Render eligible scenes"
+            div.nle-inspector-content data-workspace-panel="color" hidden="hidden"
+              h2.nle-panel-heading "COLOR / PRIMARY GRADE"
+              p.muted "Adjust the monitor preview."
+              label for="brightness" "Brightness"
+              input#brightness type="range" min="0" max="200" value="100" data-editor-control="brightness"
+              label for="contrast" "Contrast"
+              input#contrast type="range" min="0" max="200" value="100" data-editor-control="contrast"
+              label for="saturation" "Saturation"
+              input#saturation type="range" min="0" max="200" value="100" data-editor-control="saturation"
+              label for="hue" "Hue"
+              input#hue type="range" min="-180" max="180" value="0" data-editor-control="hue"
+              button.secondary type="button" data-editor-reset="true" "Reset preview"
+            div.nle-inspector-content data-workspace-panel="fairlight" hidden="hidden"
+              h2.nle-panel-heading "FAIRLIGHT / MASTER AUDIO"
+              p.muted "Controls the selected clip's embedded audio during preview."
+              label for="master-volume" "Master volume"
+              input#master-volume type="range" min="0" max="100" value="100"
+              button.secondary type="button" data-editor-action="mute" aria-pressed="false" "Mute audio"
+              p.muted "Separate voice tracks and audio mixing are not available yet."
+            div.nle-inspector-content data-workspace-panel="deliver" hidden="hidden"
+              h2.nle-panel-heading "DELIVER"
+              p.muted "Downloads contain original media, not preview adjustments."
+              if hasVideo
+                a.secondary href="{{selectedVideoUrl}}" download="download" "Download selected clip"
+              else
+                p.muted "Render a scene to download a clip."
+              a.secondary href="{{xmlHref}}" "Export scene XML"
+        section.nle-panel.nle-timeline
+          h2.nle-panel-heading "SEQUENCE TIMELINE / SELECT A SCENE"
+          if hasRows
+            div.nle-track
+              span.nle-track-label "VIDEO 1"
+              div.nle-clips
+                for row in rows
+                  if row.selected
+                    a.nle-clip.selected href="{{row.videoEditorHref}}" aria-current="true" "{{row.title}}"
+                  else
+                    a.nle-clip href="{{row.videoEditorHref}}" "{{row.title}}"
+          else
+            p.muted "The production does not have any scenes yet."

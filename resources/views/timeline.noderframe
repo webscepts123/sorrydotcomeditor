@@ -1,0 +1,65 @@
+html lang="en"
+  head
+    meta charset="utf-8"
+    meta name="viewport" content="width=device-width, initial-scale=1"
+    title "{{title}} — Timeline"
+    link rel="stylesheet" href="/public/app.css"
+    script src="/public/navigation.js" defer="defer"
+  body
+    div.app-shell
+      nav.side-nav
+        h2.brand "VOID"
+          span.brand-mark "S"
+        for item in navigation
+          if item.submenu
+            div.nav-group
+              div.nav-group-heading
+                if item.href
+                  a.nav-link href="{{item.href}}" "{{item.label}}"
+                else
+                  span.nav-group-label "{{item.label}}"
+                button.nav-toggle type="button" aria-expanded="true" aria-controls="{{item.id}}" aria-label="Toggle {{item.label}} submenu" "+"
+              div.nav-submenu id="{{item.id}}"
+                for link in item.links
+                  a.submenu-link href="{{link.href}}" "{{link.label}}"
+          else
+            a.nav-link href="{{item.href}}" "{{item.label}}"
+        form method="post" action="/logout"
+          button.nav-logout type="submit" "Logout"
+      main.content
+        div.topbar
+          p "SYSTEM STATUS: ACTIVE"
+          form method="get" action="/scenes/create"
+            button.secondary type="submit" "NEW CLIP +"
+        p.eyebrow "PRODUCTION HUB / SEQUENCER"
+        div.page-heading
+          h1 "{{title}}"
+          a.nav-link href="{{projectHref}}" "Production overview"
+        if message
+          p.notice "{{message}}"
+        div.action-row
+          a.primary-link href="{{sceneCreateHref}}" "Add sequence"
+          a.nav-link href="{{editorHref}}" "Open editor"
+          a.nav-link href="{{videoEditorHref}}" "Open video editor"
+          a.nav-link href="{{xmlHref}}" "Export XML"
+          form method="post" action="{{renderAction}}"
+            button.primary type="submit" "Batch render all scenes"
+        if hasRows
+          for row in rows
+            article.record-card
+              h2 "{{row.title}}"
+              p.muted "{{row.summary}}"
+              span.status "{{row.status}}"
+              div.action-row
+                a.primary-link href="{{row.href}}" "Edit sequence and cast"
+                form method="post" action="{{row.renderHref}}"
+                  button.secondary type="submit" "Render this scene"
+                form method="post" action="{{row.syncHref}}"
+                  button.secondary type="submit" "Check render status"
+                form method="post" action="{{row.deleteHref}}"
+                  button.danger type="submit" "Delete sequence"
+        else
+          article.record-card
+            h2 "Timeline is empty"
+            p.muted "Add a scene with its script, project, and cast references to begin the sequence."
+            a.primary-link href="{{sceneCreateHref}}" "Add the first scene"

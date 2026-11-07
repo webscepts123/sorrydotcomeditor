@@ -1,0 +1,106 @@
+html lang="en"
+  head
+    meta charset="utf-8"
+    meta name="viewport" content="width=device-width, initial-scale=1"
+    title "{{title}} — sorrydotcomeditor"
+    link rel="stylesheet" href="/public/app.css"
+    script src="/public/navigation.js" defer="defer"
+  body
+    div.app-shell
+      nav.side-nav
+        h2.brand "VOID"
+          span.brand-mark "S"
+        for item in navigation
+          if item.submenu
+            div.nav-group
+              div.nav-group-heading
+                if item.href
+                  a.nav-link href="{{item.href}}" "{{item.label}}"
+                else
+                  span.nav-group-label "{{item.label}}"
+                button.nav-toggle type="button" aria-expanded="true" aria-controls="{{item.id}}" aria-label="Toggle {{item.label}} submenu" "+"
+              div.nav-submenu id="{{item.id}}"
+                for link in item.links
+                  a.submenu-link href="{{link.href}}" "{{link.label}}"
+          else
+            a.nav-link href="{{item.href}}" "{{item.label}}"
+        form method="post" action="/logout"
+          button.nav-logout type="submit" "Logout"
+      main.content
+        div.topbar
+          p "SYSTEM STATUS: ACTIVE"
+          form method="get" action="/scenes/create"
+            button.secondary type="submit" "NEW CLIP +"
+        p.eyebrow "PRODUCTION HUB"
+        div.page-heading
+          h1 "{{title}}"
+          if createHref
+            a.primary-link href="{{createHref}}" "Create new"
+        if message
+          p.notice "{{message}}"
+        if showForm
+          form.form-card method="post" action="{{formAction}}"
+            for field in fields
+              label for="{{field.name}}" "{{field.label}}"
+              if field.multiline
+                textarea id="{{field.name}}" name="{{field.name}}" rows="5" "{{field.value}}"
+              else if field.type == "select"
+                select id="{{field.name}}" name="{{field.name}}"
+                  for option in field.options
+                    if option.selected
+                      option value="{{option.value}}" selected="selected" "{{option.label}}"
+                    else
+                      option value="{{option.value}}" "{{option.label}}"
+              else
+                input id="{{field.name}}" type="{{field.type}}" name="{{field.name}}" value="{{field.value}}"
+            button.primary type="submit" "Save"
+          a.nav-link href="{{cancelHref}}" "Cancel"
+        if renderAction
+          form method="post" action="{{renderAction}}"
+            button.primary type="submit" "Queue ComfyUI render"
+        if syncAction
+          form method="post" action="{{syncAction}}"
+            button.secondary type="submit" "Check render status"
+        if seedanceAction
+          form method="post" action="{{seedanceAction}}"
+            button.primary type="submit" "Generate with Seedance"
+        if prepareAction
+          form method="post" action="{{prepareAction}}"
+            button.secondary type="submit" "Prepare for face sync"
+        if posterAction
+          form method="post" action="{{posterAction}}"
+            button.secondary type="submit" "Generate poster"
+        if imageAction
+          form method="post" action="{{imageAction}}"
+            button.secondary type="submit" "Generate character reference"
+        if exportHref
+          a.primary-link href="{{exportHref}}" "Export character"
+        if storyAction
+          form method="post" action="{{storyAction}}"
+            input type="hidden" name="project_id" value="{{storyProjectId}}"
+            button.secondary type="submit" "Generate story"
+        if timelineHref
+          a.nav-link href="{{timelineHref}}" "Open timeline"
+        if videoEditorHref
+          a.nav-link href="{{videoEditorHref}}" "Open video editor"
+        if editHref
+          a.primary-link href="{{editHref}}" "Edit"
+        if extraHref
+          a.primary-link href="{{extraHref}}" "{{extraLabel}}"
+        if hasRows
+          for row in rows
+            article.record-card
+              a.record-title href="{{row.href}}" "{{row.title}}"
+              p.muted "{{row.summary}}"
+              span.status "{{row.status}}"
+        for field in fields
+          if !showForm
+            article.detail-row
+              strong "{{field.label}}"
+              p "{{field.value}}"
+        if !hasRows
+          if emptyMessage
+            p.muted "{{emptyMessage}}"
+        if showDelete
+          form method="post" action="{{deleteAction}}"
+            button.danger type="submit" "Delete"

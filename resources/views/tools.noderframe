@@ -1,0 +1,67 @@
+html lang="en"
+  head
+    meta charset="utf-8"
+    meta name="viewport" content="width=device-width, initial-scale=1"
+    title "{{title}} — Production Hub"
+    link rel="stylesheet" href="/public/app.css"
+    script src="/public/navigation.js" defer="defer"
+  body
+    div.app-shell
+      nav.side-nav
+        h2.brand "VOID"
+          span.brand-mark "S"
+        for item in navigation
+          if item.submenu
+            div.nav-group
+              div.nav-group-heading
+                if item.href
+                  a.nav-link href="{{item.href}}" "{{item.label}}"
+                else
+                  span.nav-group-label "{{item.label}}"
+                button.nav-toggle type="button" aria-expanded="true" aria-controls="{{item.id}}" aria-label="Toggle {{item.label}} submenu" "+"
+              div.nav-submenu id="{{item.id}}"
+                for link in item.links
+                  a.submenu-link href="{{link.href}}" "{{link.label}}"
+          else
+            a.nav-link href="{{item.href}}" "{{item.label}}"
+        form method="post" action="/logout"
+          button.nav-logout type="submit" "Logout"
+      main.content
+        div.topbar
+          p "SYSTEM STATUS: ACTIVE"
+          form method="get" action="/scenes/create"
+            button.secondary type="submit" "NEW CLIP +"
+        p.eyebrow "PRODUCTION HUB / TOOLS"
+        h1 "{{title}}"
+        if message
+          p.notice "{{message}}"
+        if pageType == "script"
+          article.record-card
+            h2 "Script breakdown"
+            p.muted "Paste a screenplay or story passage to ask the configured AI provider for numbered production scenes."
+            form.form-card method="post" action="/tools/script/parse"
+              label for="script" "Script"
+              textarea id="script" name="script" rows="14" "{{scriptText}}"
+              button.primary type="submit" "Parse into scenes"
+        if pageType == "gen-score"
+          article.record-card
+            h2 "Score generation"
+            p.muted "The original audio-generation provider is not connected in this Noderyx port. Configure an audio provider before generating or downloading score files."
+            label "Atmosphere / AI prompt"
+            textarea rows="5" "{{scorePrompt}}"
+            label "Target duration"
+            input type="number" value="60"
+            label "BPM / pacing"
+            input type="number" value="90"
+        if pageType == "sync-face"
+          article.record-card
+            h2 "Prepare cast for real-to-video"
+            p.muted "Select a character identity to validate its reference image and prepare the saved video prompt."
+            if hasRows
+              for row in rows
+                div.detail-row
+                  a.record-title href="{{row.href}}" "{{row.title}}"
+                  p.muted "{{row.summary}}"
+                  a.nav-link href="{{row.prepareHref}}" "Open sync preparation"
+            else
+              p.muted "Create a character and add a reference image first."

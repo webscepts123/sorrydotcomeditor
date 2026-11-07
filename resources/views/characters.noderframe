@@ -1,0 +1,121 @@
+html lang="en"
+  head
+    meta charset="utf-8"
+    meta name="viewport" content="width=device-width, initial-scale=1"
+    title "{{title}} — Production Hub"
+    link rel="stylesheet" href="/public/app.css"
+    script src="/public/navigation.js" defer="defer"
+  body
+    div.app-shell
+      nav.side-nav
+        h2.brand "VOID"
+          span.brand-mark "S"
+        for item in navigation
+          if item.submenu
+            div.nav-group
+              div.nav-group-heading
+                if item.href
+                  a.nav-link href="{{item.href}}" "{{item.label}}"
+                else
+                  span.nav-group-label "{{item.label}}"
+                button.nav-toggle type="button" aria-expanded="true" aria-controls="{{item.id}}" aria-label="Toggle {{item.label}} submenu" "+"
+              div.nav-submenu id="{{item.id}}"
+                for link in item.links
+                  a.submenu-link href="{{link.href}}" "{{link.label}}"
+          else
+            a.nav-link href="{{item.href}}" "{{item.label}}"
+        form method="post" action="/logout"
+          button.nav-logout type="submit" "Logout"
+      main.content
+        div.topbar
+          p "SYSTEM STATUS: ACTIVE"
+          form method="get" action="/scenes/create"
+            button.secondary type="submit" "NEW CLIP +"
+        p.eyebrow "PRODUCTION HUB / CAST IDENTITY"
+        div.page-heading
+          h1 "{{title}}"
+          if pageType == "index"
+            a.primary-link href="{{createHref}}" "Initialize character"
+        if message
+          p.notice "{{message}}"
+        if pageType == "index"
+          div.action-row
+            form method="get" action="/characters/export"
+              button.secondary type="submit" "Export character data"
+            a.nav-link href="{{createHref}}" "Add character"
+          if hasProjects
+            form.form-card method="post" action="/characters/import"
+              label for="import_project" "Import into project"
+              select id="import_project" name="project_id"
+                for option in projectOptions
+                  option value="{{option.value}}" "{{option.label}}"
+              label for="characters_json" "Character JSON array"
+              textarea id="characters_json" name="characters_json" rows="5"
+              button.secondary type="submit" "Import characters"
+          else
+            p.muted "Create a production before importing project-specific character identities."
+          if hasRows
+            div.project-grid
+              for row in rows
+                article.record-card
+                  if row.imageUrl
+                    img.project-poster src="{{row.imageUrl}}" alt="Character reference"
+                  a.record-title href="{{row.href}}" "{{row.title}}"
+                  p.muted "{{row.summary}}"
+                  span.status "{{row.status}}"
+          else
+            article.record-card
+              h2 "No cast identities yet"
+              p.muted "Create a character identity and reference prompt for production scenes."
+              a.primary-link href="{{createHref}}" "Initialize character"
+        if pageType == "form"
+          form.form-card method="post" action="{{formAction}}"
+            for field in fields
+              label for="{{field.name}}" "{{field.label}}"
+              if field.multiline
+                textarea id="{{field.name}}" name="{{field.name}}" rows="5" "{{field.value}}"
+              else if field.type == "select"
+                select id="{{field.name}}" name="{{field.name}}"
+                  for option in field.options
+                    if option.selected
+                      option value="{{option.value}}" selected="selected" "{{option.label}}"
+                    else
+                      option value="{{option.value}}" "{{option.label}}"
+              else
+                input id="{{field.name}}" type="{{field.type}}" name="{{field.name}}" value="{{field.value}}"
+            button.primary type="submit" "{{submitLabel}}"
+          form.form-card method="post" action="/characters/generate-details"
+            label for="ai_name" "Character name for AI profile"
+            input id="ai_name" type="text" name="name" value="{{character.name}}"
+            label for="ai_role" "Role / archetype"
+            input id="ai_role" type="text" name="role" value="{{character.role}}"
+            button.secondary type="submit" "Generate character profile"
+          a.nav-link href="/characters" "Cancel"
+        if pageType == "show"
+          article.record-card
+            if character.imageUrl
+              img.project-poster src="{{character.imageUrl}}" alt="Character reference image"
+            h2 "{{character.name}}"
+            p.muted "{{character.description}}"
+            p "AI seed tag: {{character.ai_tag}}"
+            p "Role: {{character.role}}"
+            p "Personality: {{character.personality}}"
+            p "Dialogue style: {{character.dialogue_style}}"
+            p "Image prompt: {{character.prompt}}"
+            p "Video prompt: {{character.video_prompt}}"
+            div.action-row
+              a.primary-link href="{{editHref}}" "Edit identity"
+              a.nav-link href="{{exportHref}}" "Export character"
+              form method="post" action="{{imageAction}}"
+                button.primary type="submit" "Generate reference image"
+              form method="post" action="{{prepareAction}}"
+                button.secondary type="submit" "Prepare for face sync"
+              form method="post" action="{{deleteAction}}"
+                button.danger type="submit" "Terminate identity"
+          h2 "Move character to another production"
+          form.form-card method="post" action="{{transferAction}}"
+            label for="destination_project" "Destination project"
+            select id="destination_project" name="project_id"
+              for option in projectOptions
+                option value="{{option.value}}" "{{option.label}}"
+            button.secondary type="submit" "Transfer character"

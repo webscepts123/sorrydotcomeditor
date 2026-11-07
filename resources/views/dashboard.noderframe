@@ -1,0 +1,112 @@
+html lang="en"
+  head
+    meta charset="utf-8"
+    meta name="viewport" content="width=device-width, initial-scale=1"
+    title "{{title}}"
+    link rel="stylesheet" href="/public/app.css"
+    script src="/public/navigation.js" defer="defer"
+    script src="/public/dashboard.js" defer="defer"
+  body
+    div.app-shell
+      nav.side-nav
+        h2.brand "VOID"
+          span.brand-mark "S"
+        for item in navigation
+          if item.submenu
+            div.nav-group
+              div.nav-group-heading
+                if item.href
+                  a.nav-link href="{{item.href}}" "{{item.label}}"
+                else
+                  span.nav-group-label "{{item.label}}"
+                button.nav-toggle type="button" aria-expanded="true" aria-controls="{{item.id}}" aria-label="Toggle {{item.label}} submenu" "+"
+              div.nav-submenu id="{{item.id}}"
+                for link in item.links
+                  a.submenu-link href="{{link.href}}" "{{link.label}}"
+          else
+            a.nav-link href="{{item.href}}" "{{item.label}}"
+        form method="post" action="/logout"
+          button.nav-logout type="submit" "Logout"
+      main.content
+        div.topbar
+          p "SYSTEM STATUS: ACTIVE"
+          form method="get" action="/scenes/create"
+            button.secondary type="submit" "NEW CLIP +"
+        p.eyebrow "PRODUCTION HUB"
+        h1 "{{title}}"
+        if message
+          p.notice "{{message}}"
+        div.dashboard-grid
+          section.dashboard-card
+            p.eyebrow "ACTIVE PRODUCTION"
+            if activeProject
+              h2 "{{activeProject.title}}"
+              p.muted "Style: {{activeProject.style}}"
+              div.action-row
+                a.secondary href="{{activeProject.videoEditorHref}}" "Open video editor"
+                a.secondary href="{{activeProject.editorHref}}" "Open AI editor"
+              p "Timeline progress: {{activeProject.estimatedMinutes}} / 150 min"
+              p.muted "{{activeProject.scenes}} scenes; estimated at 15 minutes each ({{activeProject.progress}}% of target)."
+            else
+              h2 "No active project"
+              p.muted "Initialize a production to start building its timeline."
+              a.secondary href="{{createHref}}" "Initialize project"
+          section.dashboard-card
+            p.eyebrow "AI RENDER QUEUE"
+            if renderingScene
+              a.record-title href="{{renderingScene.href}}" "{{renderingScene.title}}"
+              p.muted "{{renderingScene.project}} / {{renderingScene.status}}"
+            else
+              h2 "Queue empty"
+              p.muted "No scenes are currently rendering."
+            if nextScene
+              p "Next: {{nextScene.title}} ({{nextScene.status}})"
+              a.nav-link href="{{nextScene.href}}" "{{nextScene.project}}"
+            else
+              p.muted "Next: none"
+          section.dashboard-card#resource-widget data-status-url="/dashboard/runpod-status"
+            p.eyebrow "RENDER WORKER RESOURCES"
+            h2#worker-status "Checking status"
+            p#worker-gpu.muted "GPU: unavailable"
+            p#worker-version.muted "ComfyUI: unavailable"
+            p "Storage: {{storage}}"
+            p#worker-vram "GPU VRAM: unavailable"
+            p#worker-ram "System RAM: unavailable"
+            p#worker-queue.muted "ComfyUI queue: unavailable"
+            p#worker-updated.muted "Checking render worker..."
+          section.dashboard-card.dashboard-tools
+            p.eyebrow "PRODUCTION TOOLS"
+            div.action-row
+              a.secondary href="{{newSceneHref}}" "New shot"
+              if activeProject
+                a.secondary href="{{activeProject.videoEditorHref}}" "Video editor"
+              else
+                span.muted "Video editor: create a project first"
+              a.secondary href="{{syncFaceHref}}" "Sync face"
+              a.secondary href="{{scoreHref}}" "Gen score"
+              a.secondary href="{{scriptHref}}" "Script"
+          section.dashboard-card
+            p.eyebrow "TEAM / CAST"
+            if hasTeam
+              for editor in team
+                div.detail-row
+                  a.record-title href="{{editor.href}}" "{{editor.name}}"
+                  p.muted "{{editor.role}}"
+            else
+              p.muted "No editors assigned."
+            a.nav-link href="{{editorsHref}}" "Manage editors"
+        div.stats
+          for stat in stats
+            article.stat-card
+              p.muted "{{stat.label}}"
+              h2 "{{stat.value}}"
+        div.page-heading
+          h2 "Recent projects"
+          a.primary-link href="{{createHref}}" "New project"
+        for row in rows
+          a.record-card href="{{row.href}}"
+            h3 "{{row.title}}"
+            p.muted "{{row.summary}}"
+            span.status "{{row.status}}"
+        if !hasRows
+          p.muted "No projects yet. Create a project to begin."

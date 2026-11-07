@@ -1,0 +1,21 @@
+html lang="en"
+  head
+    meta charset="utf-8"
+    meta name="viewport" content="width=device-width, initial-scale=1"
+    title "Initial setup — sorrydotcomeditor"
+    link rel="stylesheet" href="/public/app.css"
+  body
+    main.auth-card
+      p.eyebrow "FIRST RUN"
+      h1 "Create administrator"
+      p.muted "This setup page is only available before the first account is created."
+      if message
+        p.notice "{{message}}"
+      form method="post" action="/setup"
+        label for="name" "Name"
+        input#name type="text" name="name" autocomplete="name" required="required"
+        label for="email" "Email"
+        input#email type="email" name="email" autocomplete="username" required="required"
+        label for="password" "Password (12 characters minimum)"
+        input#password type="password" name="password" autocomplete="new-password" minlength="12" required="required"
+        button.primary type="submit" "Create account"

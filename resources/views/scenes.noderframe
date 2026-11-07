@@ -1,0 +1,96 @@
+html lang="en"
+  head
+    meta charset="utf-8"
+    meta name="viewport" content="width=device-width, initial-scale=1"
+    title "{{title}} — Production Hub"
+    link rel="stylesheet" href="/public/app.css"
+    script src="/public/navigation.js" defer="defer"
+  body
+    div.app-shell
+      nav.side-nav
+        h2.brand "VOID"
+          span.brand-mark "S"
+        for item in navigation
+          if item.submenu
+            div.nav-group
+              div.nav-group-heading
+                if item.href
+                  a.nav-link href="{{item.href}}" "{{item.label}}"
+                else
+                  span.nav-group-label "{{item.label}}"
+                button.nav-toggle type="button" aria-expanded="true" aria-controls="{{item.id}}" aria-label="Toggle {{item.label}} submenu" "+"
+              div.nav-submenu id="{{item.id}}"
+                for link in item.links
+                  a.submenu-link href="{{link.href}}" "{{link.label}}"
+          else
+            a.nav-link href="{{item.href}}" "{{item.label}}"
+        form method="post" action="/logout"
+          button.nav-logout type="submit" "Logout"
+      main.content
+        div.topbar
+          p "SYSTEM STATUS: ACTIVE"
+          form method="get" action="/scenes/create"
+            button.secondary type="submit" "NEW CLIP +"
+        p.eyebrow "PRODUCTION HUB / SCENE SEQUENCER"
+        div.page-heading
+          h1 "{{title}}"
+          if pageType == "index"
+            a.primary-link href="{{createHref}}" "Add scene"
+        if message
+          p.notice "{{message}}"
+        if pageType == "index"
+          p.muted "Scenes are production beats linked to a project, cast, and render job."
+          if hasRows
+            for row in rows
+              article.record-card
+                a.record-title href="{{row.href}}" "{{row.title}}"
+                p.muted "{{row.summary}}"
+                span.status "{{row.status}}"
+          else
+            article.record-card
+              h2 "No scenes yet"
+              p.muted "Choose a production and add its first timeline sequence."
+              a.primary-link href="{{createHref}}" "Create scene"
+        if pageType == "form"
+          form.form-card method="post" action="{{formAction}}"
+            for field in fields
+              label for="{{field.name}}" "{{field.label}}"
+              if field.multiline
+                textarea id="{{field.name}}" name="{{field.name}}" rows="6" "{{field.value}}"
+              else if field.type == "select"
+                select id="{{field.name}}" name="{{field.name}}"
+                  for option in field.options
+                    if option.selected
+                      option value="{{option.value}}" selected="selected" "{{option.label}}"
+                    else
+                      option value="{{option.value}}" "{{option.label}}"
+              else
+                input id="{{field.name}}" type="{{field.type}}" name="{{field.name}}" value="{{field.value}}"
+            button.primary type="submit" "{{submitLabel}}"
+          a.nav-link href="{{cancelHref}}" "Cancel"
+        if pageType == "show"
+          article.record-card
+            h2 "Sequence {{scene.order_index}}"
+            p.muted "{{scene.script_segment}}"
+            span.status "{{scene.status}}"
+            p "Project: {{projectTitle}}"
+            if videoUrl
+              video controls="controls" src="{{videoUrl}}"
+            div.action-row
+              a.primary-link href="{{editHref}}" "Edit sequence"
+              form method="post" action="{{renderAction}}"
+                button.primary type="submit" "Queue ComfyUI render"
+              form method="post" action="{{seedanceAction}}"
+                button.secondary type="submit" "Generate with Seedance"
+              form method="post" action="{{syncAction}}"
+                button.secondary type="submit" "Check render status"
+              form method="post" action="{{deleteAction}}"
+                button.danger type="submit" "Delete sequence"
+          h2 "Assigned cast"
+          if hasCharacters
+            for character in characters
+              article.detail-row
+                strong "{{character.name}}"
+                p.muted "{{character.role}}"
+          else
+            p.muted "No cast members assigned to this scene."

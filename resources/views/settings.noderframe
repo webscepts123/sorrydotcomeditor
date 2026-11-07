@@ -1,0 +1,53 @@
+html lang="en"
+  head
+    meta charset="utf-8"
+    meta name="viewport" content="width=device-width, initial-scale=1"
+    title "Settings — Production Hub"
+    link rel="stylesheet" href="/public/app.css"
+    script src="/public/navigation.js" defer="defer"
+  body
+    div.app-shell
+      nav.side-nav
+        h2.brand "VOID"
+          span.brand-mark "S"
+        for item in navigation
+          if item.submenu
+            div.nav-group
+              div.nav-group-heading
+                if item.href
+                  a.nav-link href="{{item.href}}" "{{item.label}}"
+                else
+                  span.nav-group-label "{{item.label}}"
+                button.nav-toggle type="button" aria-expanded="true" aria-controls="{{item.id}}" aria-label="Toggle {{item.label}} submenu" "+"
+              div.nav-submenu id="{{item.id}}"
+                for link in item.links
+                  a.submenu-link href="{{link.href}}" "{{link.label}}"
+          else
+            a.nav-link href="{{item.href}}" "{{item.label}}"
+        form method="post" action="/logout"
+          button.nav-logout type="submit" "Logout"
+      main.content
+        div.topbar
+          p "SYSTEM STATUS: ACTIVE"
+          form method="get" action="/scenes/create"
+            button.secondary type="submit" "NEW CLIP +"
+        p.eyebrow "PRODUCTION HUB / SYSTEM"
+        h1 "System settings"
+        if message
+          p.notice "{{message}}"
+        article.record-card
+          h2 "Runtime configuration"
+          p.muted "Set credentials and connection strings in the server environment. Secrets are not displayed or changed in this page."
+          for field in fields
+            div.detail-row
+              strong "{{field.label}}"
+              p "{{field.value}}"
+        article.record-card
+          h2 "Provider setup"
+          p "AI stories and character profiles: AI_ENABLED, AI_PROVIDER, and the matching AI API key."
+          p "Poster and character images: OPENAI_API_KEY."
+          p "Seedance video: SEEDANCE_API_KEY and SEEDANCE_BASE_URL."
+          p "ComfyUI rendering: COMFYUI_URL and COMFYUI_VIDEO_WORKFLOW."
+          p "Local Wan 2.1: WAN_LOCAL_URL and WAN_LOCAL_WORKFLOW. Installed under D:\\AI; start with npm run wan:start. Check availability in the editor's AI Engine tab."
+          p "Database: configure DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, and DB_NAME before running migrations."
+          p.muted "Application health endpoint: /health"

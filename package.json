@@ -1,17 +1,46 @@
 {
-    "$schema": "https://www.schemastore.org/package.json",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "build": "vite build",
-        "dev": "vite"
-    },
-    "devDependencies": {
-        "@tailwindcss/vite": "^4.0.0",
-        "axios": "^1.11.0",
-        "concurrently": "^9.0.1",
-        "laravel-vite-plugin": "^2.0.0",
-        "tailwindcss": "^4.0.0",
-        "vite": "^7.0.7"
-    }
+  "name": "sorrydotcomeditor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Noderyx Framework starter application.",
+  "type": "module",
+  "scripts": {
+    "dev": "noderyx-framework serve --watch",
+    "live": "noderyx-framework live",
+    "start": "node server.js",
+    "test": "node --test",
+    "wan:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local-wan.ps1",
+    "kaggle:import": "node scripts/import-kaggle-video.js",
+    "framework:update": "noderyx-framework update",
+    "qa": "noderyx-framework qa",
+    "build": "noderyx-framework build resources/views public/generated",
+    "cpanel:build": "noderyx-framework cpanel:build",
+    "build:native": "noderyx-framework build:native --views=resources/mobile",
+    "mobile:builder": "noderyx-framework mobile:builder",
+    "native:init": "noderyx-framework native:init",
+    "native:android": "noderyx-framework native:run android",
+    "native:ios": "noderyx-framework native:run ios",
+    "native:start": "noderyx-framework native:start",
+    "build:mobile": "noderyx-framework build:mobile",
+    "mobile:init": "noderyx-framework mobile:init",
+    "mobile:android": "noderyx-framework mobile:run android",
+    "mobile:ios": "noderyx-framework mobile:run ios",
+    "build:desktop": "noderyx-framework build:desktop",
+    "desktop:init": "noderyx-framework desktop:init",
+    "desktop:run": "noderyx-framework desktop:run",
+    "desktop:windows": "noderyx-framework desktop:package windows",
+    "desktop:mac": "noderyx-framework desktop:package mac",
+    "editor:install": "noderyx-framework editor:install",
+    "db:create": "node scripts/create-database.js",
+    "migrate": "noderyx-framework migrate",
+    "seed": "noderyx-framework db:seed"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "mysql2": "^3.24.6",
+    "noderyx-framework": ">=0.9.0 <1.0.0"
+  },
+  "engines": {
+    "node": ">=26"
+  }
 }

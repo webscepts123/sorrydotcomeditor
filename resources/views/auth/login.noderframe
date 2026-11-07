@@ -1,0 +1,21 @@
+html lang="en"
+  head
+    meta charset="utf-8"
+    meta name="viewport" content="width=device-width, initial-scale=1"
+    title "Sign in — sorrydotcomeditor"
+    link rel="stylesheet" href="/public/app.css"
+  body
+    main.auth-shell
+      p.studio-logo "VOID"
+        span "SHADOW"
+        span.studio-logo-suffix "EDITOR"
+      div.auth-card
+        if message
+          p.notice "{{message}}"
+        form method="post" action="/login"
+          label for="email" "Identification"
+          input#email type="email" name="email" placeholder="EMAIL@VOIDSHADOW.COM" autocomplete="username" required="required"
+          label for="password" "Encryption key"
+          input#password type="password" name="password" autocomplete="current-password" required="required"
+          button.primary type="submit" "Initiate access"
+      p.auth-status "SYSTEM STATUS: ONLINE"
