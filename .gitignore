@@ -93,3 +93,6 @@ DerivedData/
 Thumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+
+!platforms/desktop/build/
+!platforms/desktop/build/icon.png

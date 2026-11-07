@@ -37,6 +37,14 @@ npm.cmd run build
 npm.cmd test
 ```
 
+## Desktop app
+
+Void Shadow Studio uses Electron to display the live studio. Website deployments appear when the app is reopened or reloaded; the existing main-branch deployment workflow publishes website changes.
+
+Install desktop dependencies with `npm.cmd ci --prefix platforms/desktop`, launch with `npm.cmd run desktop:run`, and build the Windows installer with `npm.cmd run desktop:windows`. Desktop source is maintained in `platforms/desktop`; do not run the framework desktop generator over these files. The app uses a custom Void Shadow logo, isolated renderer, and disabled developer tools.
+
+Packaged apps check GitHub Releases at startup and every six hours, download newer installers, and install on normal exit. Install the new updater-enabled build once on existing machines. Releases must be publicly readable. To publish a Windows release, increment the version in `platforms/desktop/package.json` and its lockfile, then push a matching `vX.Y.Z` tag. The desktop release workflow builds the installer, blockmap, and update metadata, then publishes the GitHub release. Optional `WINDOWS_CSC_LINK` and `WINDOWS_CSC_KEY_PASSWORD` repository secrets enable certificate signing. macOS packaging requires macOS and signing configuration and is not published by this Windows workflow.
+
 Run `npm.cmd run seed` to add three sample projects and related production records for checking the editor. Repeating the command preserves existing demo projects. Samples belong to the first existing user; if no account exists, complete `/setup` to claim them. Media records contain briefs only, without generated files.
 
 The application entry point is `server.js`; runtime settings are in `noderyx.config.js`, controllers are in `app/Controllers/`, repositories are in `app/Models/`, migrations are in `database/migrations/`, and views are in `resources/views/`.

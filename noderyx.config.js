@@ -137,10 +137,15 @@ export default {
     apiUrl: process.env.MOBILE_API_URL ?? null
   },
 
-  // Windows and macOS apps: noderyx desktop:init
-  // App ID, name, views, and API URL fall back to the mobile block.
+  // The desktop window connects to the online studio; it requires internet.
   desktop: {
+    appId: "com.sorrydotcom.editor",
+    appName: "Void Shadow Studio",
+    views: "resources/mobile",
+    apiUrl: "https://studio.sorrydotcom.lk",
+    liveReloadUrl: "https://studio.sorrydotcom.lk",
     out: "platforms/desktop",
+    devTools: false,
     window: { width: 1200, height: 800, minWidth: 720, minHeight: 480 }
   }
 };

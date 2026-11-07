@@ -21,7 +21,7 @@ output += "    <link rel=\"stylesheet\" href=\"/public/studio/bootstrap-icons.cs
 output += "    <link rel=\"stylesheet\" href=\"/public/studio/fonts.css\">\n";
 output += "\n";
 output += "    <link rel=\"stylesheet\" href=\"/public/studio/videoeditor.css\">\n";
-output += "<link rel=\"icon\" href=\"data:,\"></head>\n";
+output += "<link rel=\"icon\" href=\"/public/studio/brand.svg\"></head>\n";
 output += "<body>\n";
 output += "\n";
 output += "<div class=\"nle-container\">\n";
@@ -30,7 +30,7 @@ output += "    <!-- Top Header Bar -->\n";
 output += "    <div class=\"nle-header\">\n";
 output += "        <div class=\"nle-menus\">\n";
 output += "            <span class=\"fw-bold text-white me-2\" style=\"font-family: 'Syncopate'; font-size: 11px; letter-spacing: 1px;\">\n";
-output += "                VOID SHADOW <span class=\"text-info\">STUDIO</span>\n";
+output += "                <img src=\"/public/studio/brand.svg\" class=\"studio-logo\" alt=\"\"> VOID SHADOW <span class=\"text-info\">STUDIO</span>\n";
 output += "            </span>\n";
 output += "            \n";
 output += "            <div class=\"nle-menu-group\">\n";
@@ -1631,5 +1631,5 @@ output += "\n";
 output += "<script src=\"/public/studio/bootstrap.bundle.min.js\"></script>\n";
 output += "</body>\n";
 output += "</html>\n";
-return output.replace('</head>', '<script src="/public/studio/local-wan.js" defer></script></head>');
+return output.replace('</head>', '<script src="/public/studio/interaction.js" defer></script>').replace('</head>', '<script src="/public/studio/local-wan.js" defer></script></head>');
 }
