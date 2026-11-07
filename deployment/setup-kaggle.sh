@@ -14,5 +14,11 @@ for candidate in python3.14 python3.13 python3.12 python3.11 /opt/alt/python313/
   fi
 done
 [[ -n "$PYTHON" ]] || { echo 'Kaggle requires Python 3.11 or newer on the studio server.'; exit 1; }
-"$PYTHON" -m venv "$VENV"
+"$PYTHON" -m venv --without-pip "$VENV"
+if ! "$VENV/bin/python" -m pip --version >/dev/null 2>&1; then
+  # Some cPanel Python builds omit ensurepip; use pip's official bootstrap.
+  curl --fail --location --proto '=https' --tlsv1.2 https://bootstrap.pypa.io/get-pip.py -o "$BASE/shared/kaggle-get-pip.py"
+  "$VENV/bin/python" "$BASE/shared/kaggle-get-pip.py" --disable-pip-version-check
+fi
 "$VENV/bin/python" -m pip install --disable-pip-version-check -r deployment/kaggle-requirements.txt
+"$VENV/bin/python" -c 'from importlib.metadata import version; print("Kaggle CLI ready:", version("kaggle"))'
