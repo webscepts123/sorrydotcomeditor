@@ -4,7 +4,7 @@ import { importKaggleVideo } from "../app/Services/KaggleVideoImport.js";
 
 const { values } = parseArgs({ options: { scene: { type: "string" }, file: { type: "string" }, help: { type: "boolean" } } });
 if (values.help) {
-  console.log('npm run kaggle:import -- --scene 1 --file "D:/Downloads/scene-1-wan21.mp4"');
+  console.log('npm run kaggle:import -- --scene 1 --file "D:/Downloads/scene-1-cogvideox-1080p.mp4"');
 } else {
   loadEnvironment();
   const sceneId = Number(values.scene);

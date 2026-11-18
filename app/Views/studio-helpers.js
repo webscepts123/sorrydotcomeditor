@@ -36,9 +36,9 @@ export function localWanControls(scene, csrfToken) {
 
 export function kaggleControls(scene, csrfToken) {
   return `<section class="p-2 mt-2 border border-info" data-kaggle-wan data-scene-id="${escapeHtml(scene.id)}" data-job-active="${String(String(scene.generation_job_id || '').startsWith('kaggle:') && ['Rendering', 'Processing'].includes(scene.status))}">
-    <strong class="text-info small">WAN 2.1 — KAGGLE GPU</strong>
+    <strong class="text-info small">COGVIDEOX-5B — KAGGLE GPU</strong>
     <p class="text-info small"><strong>Full HD output: 1920 × 1080</strong></p>
-    <p class="text-secondary small">Wan generates at 480p, then upscales to 1080p. This increases output size; it does not add native 1080p detail.</p>
+    <p class="text-secondary small">CogVideoX-5B generates 720×480 at 8 fps (about 6 seconds), then upscales to 1080p. This increases output size; it does not add native 1080p detail.</p>
     <p class="small" role="status" aria-live="polite" data-kaggle-connection>Checking Kaggle connection…</p>
     <details data-kaggle-connect-panel>
       <summary class="nle-btn mb-2">Connect Kaggle account</summary>

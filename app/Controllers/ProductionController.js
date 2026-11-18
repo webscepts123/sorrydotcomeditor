@@ -992,8 +992,8 @@ export class ProductionController extends Controller {
   }
 
   async kaggleNotebook() {
-    const notebook = await readFile(new URL("../../notebooks/wan21-kaggle.ipynb", import.meta.url), "utf8");
-    this.context.response.setHeader("Content-Disposition", 'attachment; filename="wan21-kaggle.ipynb"');
+    const notebook = await readFile(new URL("../../notebooks/cogvideox-kaggle.ipynb", import.meta.url), "utf8");
+    this.context.response.setHeader("Content-Disposition", 'attachment; filename="cogvideox-kaggle.ipynb"');
     return this.text(notebook, 200, "application/x-ipynb+json; charset=utf-8");
   }
 
@@ -1081,7 +1081,7 @@ export class ProductionController extends Controller {
   async kaggleNotebookDocument() {
     const job = await this.kaggleJob();
     if (!job) return;
-    const notebook = JSON.parse(await readFile(new URL("../../notebooks/wan21-kaggle.ipynb", import.meta.url), "utf8"));
+    const notebook = JSON.parse(await readFile(new URL("../../notebooks/cogvideox-kaggle.ipynb", import.meta.url), "utf8"));
     const cell = notebook.cells.find(cell => cell.cell_type === "code" && cell.source.join("").includes("if JOB_FILE:"));
     if (!cell) throw new Error("Notebook scene settings cell is missing.");
     const encoded = Buffer.from(JSON.stringify(job), "utf8").toString("hex");

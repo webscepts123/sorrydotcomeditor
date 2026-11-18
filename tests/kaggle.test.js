@@ -102,7 +102,7 @@ test("Kaggle notebook download contains an unexecuted GPU workflow", async () =>
   let filename;
   const controller = new ProductionController({ response: { setHeader: (_name, value) => { filename = value; } }, text: body => body });
   const notebook = JSON.parse(await controller.kaggleNotebook());
-  assert.match(filename, /wan21-kaggle.ipynb/);
+  assert.match(filename, /cogvideox-kaggle.ipynb/);
   assert.equal(notebook.nbformat, 4);
   for (const cell of notebook.cells.filter(cell => cell.cell_type === "code")) {
     assert.equal(cell.execution_count, null);
@@ -111,7 +111,8 @@ test("Kaggle notebook download contains an unexecuted GPU workflow", async () =>
   const code = notebook.cells.flatMap(cell => cell.source).join("\n");
   assert.match(code, /torch.cuda.is_available/);
   assert.match(code, /enable_model_cpu_offload/);
-  assert.match(code, /is_bf16_supported/);
+  assert.match(code, /CogVideoXPipeline/);
+  assert.match(code, /get_device_capability/);
   assert.match(code, /export_to_video/);
   assert.doesNotMatch(code, /ngrok|cloudflared|DB_PASSWORD/);
 });
