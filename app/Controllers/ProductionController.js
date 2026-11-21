@@ -7,6 +7,7 @@ import { renderStudio } from "../Views/Studio.js";
 import { renderProductionEditor } from "../Views/ProductionEditor.js";
 import { mediaUrl } from "../Views/studio-helpers.js";
 import { createNotebookTransfer, readNotebookTransfer } from "../Services/KaggleNotebookTransfer.js";
+import { ComfyRenderFailedError } from "../Services/ComfyVideoService.js";
 
 const resourceDefinitions = {
   projects: {
@@ -1168,13 +1169,22 @@ export class ProductionController extends Controller {
       return redirect(this.context, `/scenes/${scene.id}`);
     }
     const local = scene.generation_job_id.startsWith("local:");
-    const service = local ? this.service("comfyLocal")() : this.comfy;
     let videoPath;
     try {
+      const service = local ? this.service("comfyLocal")() : this.comfy;
       videoPath = await service.downloadCompletedVideo(local ? scene.generation_job_id.slice(6) : scene.generation_job_id);
     } catch (error) {
-      await this.models.scenes.update(scene.id, { status: "failed", generation_error: error.message });
-      return this.abort(502, error.message);
+      const failed = error instanceof ComfyRenderFailedError;
+      if (failed) {
+        await this.db.query(
+          "UPDATE scenes SET status = ?, generation_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND generation_job_id = ? AND status IN ('Rendering', 'Processing')",
+          ["failed", error.message, scene.id, scene.generation_job_id]
+        );
+      }
+      const message = failed ? error.message : "The render status could not be checked. Make sure the render worker is configured and online, then try again.";
+      if (!this.wantsHtml) return this.json({ message }, 502);
+      flash(this.context, message);
+      return redirect(this.context, `/scenes/${scene.id}`);
     }
     if (!videoPath) {
       if (this.wantsHtml) {

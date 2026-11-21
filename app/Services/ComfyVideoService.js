@@ -19,6 +19,8 @@ async function responseJson(response, message) {
   return value;
 }
 
+export class ComfyRenderFailedError extends Error {}
+
 export class ComfyVideoService {
   constructor({ baseUrl = process.env.COMFYUI_URL, workflowPath = process.env.COMFYUI_VIDEO_WORKFLOW } = {}) {
     this.baseUrl = String(baseUrl ?? "").replace(/\/+$/, "");
@@ -67,7 +69,7 @@ export class ComfyVideoService {
     const history = await responseJson(historyResponse, "Could not read the ComfyUI job status.");
     const job = history?.[promptId];
     if (!job) return null;
-    if (job.status?.status_str === "error") throw new Error("ComfyUI reported a failed generation job.");
+    if (job.status?.status_str === "error") throw new ComfyRenderFailedError("ComfyUI reported a failed generation job.");
 
     for (const output of Object.values(job.outputs ?? {})) {
       for (const type of ["videos", "gifs", "images"]) {
@@ -97,7 +99,6 @@ export class ComfyVideoService {
       }
     }
 
-    if (job.status?.status_str === "error") throw new Error("ComfyUI reported a failed generation job.");
     return null;
   }
 

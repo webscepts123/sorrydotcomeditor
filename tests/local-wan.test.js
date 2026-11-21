@@ -73,6 +73,16 @@ test("local jobs retain their worker when importing completed video", async () =
   assert.equal((await controller.syncSceneRender()).status, 303);
   assert.equal(headers.Location, "/projects/2/videoeditor?scene_id=9");
   assert.equal(writes.length, 2);
+  scene.generation_job_id = "configured-job";
+  scene.status = "Rendering";
+  context.service = () => { throw new Error("COMFYUI_URL is missing"); };
+  assert.equal((await controller.syncSceneRender()).status, 303);
+  assert.equal(headers.Location, "/scenes/9");
+  assert.match(context.session.flash, /configured and online/);
+  assert.equal(scene.status, "Rendering");
+  assert.equal(writes.length, 2);
+  context.request.headers.accept = "application/json";
+  assert.equal((await controller.syncSceneRender()).status, 502);
 });
 
 test("ComfyUI image previews are not mistaken for completed video", async () => {
