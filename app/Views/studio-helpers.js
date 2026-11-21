@@ -50,6 +50,10 @@ export function kaggleControls(scene, csrfToken, { inspector = false } = {}) {
         <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
         <label for="aiPromptTextarea">Video prompt</label>
         <textarea id="aiPromptTextarea" name="prompt" rows="5" maxlength="8000" required class="nle-textarea w-100" placeholder="Describe the action, camera movement, and lighting.">${escapeHtml(scene.prompt || scene.script_segment || "")}</textarea>
+        <details class="ai-engine-options">
+          <summary>Opening shot and character reference</summary>
+          <p>Start separate lines with <strong>Opening shot:</strong> and <strong>Main shot:</strong> to create a cut. Add <strong>Reference character:</strong> and the name of an assigned character to use their portrait in the main shot.</p>
+        </details>
         <div class="ai-engine-prompt-actions">
           <button type="submit" class="nle-btn">Save prompt</button>
           <button type="button" class="nle-btn" data-studio-click="100">Enhance prompt</button>

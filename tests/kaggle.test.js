@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, writeFile, readFile, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { importKaggleVideo } from "../app/Services/KaggleVideoImport.js";
@@ -51,6 +51,39 @@ test("scene notebook includes the saved prompt safely and selects 1080p", async 
   assert.match(html, /\/scenes\/9\/kaggle-notebook/);
   controller.findOwned = async () => { throw new Error("404 Scene not found"); };
   await assert.rejects(() => controller.kaggleSceneNotebook(), /404/);
+});
+
+test("Kaggle notebook sends the opening and main shot separately with the assigned portrait", async t => {
+  const uploads = path.resolve("public/uploads");
+  await mkdir(uploads, { recursive: true });
+  const directory = await mkdtemp(path.join(uploads, "shot-test-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const portrait = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
+  await writeFile(path.join(directory, "hero.png"), portrait);
+  const scene = {
+    id: 5, project_id: 1,
+    prompt: "Opening shot: Wide view of Colombo at dawn.\nMain shot: Close-up of the hero at a doorway.\nReference character: Hero"
+  };
+  const characters = [
+    { name: "Hero", image_path: `uploads/${path.basename(directory)}/hero.png`, description: "Dark shirt" },
+    { name: "Other", image_path: "uploads/missing.png" }
+  ];
+  const controller = new ProductionController({
+    params: { id: "5" }, service: () => ({ query: async () => characters }),
+    abort: (_status, message) => { throw new Error(message); }
+  });
+  controller.findOwned = async table => table === "scenes" ? scene : { id: 1 };
+  const { body } = await controller.kaggleNotebookDocument();
+  const source = JSON.parse(body).cells.flatMap(cell => cell.source).join("");
+  const encoded = source.match(/bytes.fromhex\("([a-f0-9]+)"\)/)[1];
+  const job = JSON.parse(Buffer.from(encoded, "hex").toString("utf8"));
+  assert.equal(job.opening_prompt, "Wide view of Colombo at dawn.");
+  assert.ok(job.prompt.startsWith("Close-up of the hero at a doorway."));
+  assert.ok(!job.prompt.includes("Reference character:"));
+  assert.ok(source.includes(`REFERENCE_IMAGE = "${portrait.toString("base64")}"`));
+  assert.match(source, /CogVideoXImageToVideoPipeline/);
+  scene.prompt = scene.prompt.replace("Reference character: Hero", "Reference character: Unassigned");
+  await assert.rejects(() => controller.kaggleNotebookDocument(), /Assign the reference character/);
 });
 
 test("saving a Kaggle prompt preserves the scene script and checks ownership", async () => {

@@ -88,25 +88,33 @@ MODEL_ID = "THUDM/CogVideoX-5b"
 JOB_FILE = ""  # Example: /kaggle/input/my-private-scene/scene-1-wan-job.json
 SCENE_ID = None  # Replace with your editor's scene ID, if known.
 PROMPT = "A cinematic shot of a quiet railway platform at sunrise, soft golden light, a woman waits beside a vintage train, natural human movement, slow camera dolly forward."
+OPENING_PROMPT = ""
+REFERENCE_IMAGE = ""  # Optional base64 portrait supplied by the studio.
 NEGATIVE_PROMPT = "low quality, blurry, distorted faces, extra limbs, cartoon, watermark, text, subtitles"
 PRESET = "1080p"  # quick, 480p (native 720x480), or 1080p (720x480 generation + upscale)
 SEED = 42
 
 if JOB_FILE:
     job_path = Path(JOB_FILE)
-    if job_path.stat().st_size > 128 * 1024:
+    if job_path.stat().st_size > 6 * 1024 ** 2:
         raise ValueError("Scene JSON is too large.")
     job = json.loads(job_path.read_text(encoding="utf-8-sig"))
     if not isinstance(job, dict) or job.get("format") != "sorrydotcomeditor.wan-kaggle.v1":
         raise ValueError("Select a scene JSON exported by this editor.")
     SCENE_ID = job.get("scene_id")
     PROMPT = job.get("prompt", "")
+    OPENING_PROMPT = job.get("opening_prompt", "")
+    REFERENCE_IMAGE = job.get("reference_image", "")
     NEGATIVE_PROMPT = job.get("negative_prompt", NEGATIVE_PROMPT)
     PRESET = job.get("preset", "1080p")
     SEED = job.get("seed", 42)
 
 if not isinstance(PROMPT, str) or not PROMPT.strip() or len(PROMPT) > 12000:
     raise ValueError("Enter a scene prompt between 1 and 12000 characters.")
+if not isinstance(OPENING_PROMPT, str) or len(OPENING_PROMPT) > 12000:
+    raise ValueError("Invalid opening shot prompt.")
+if not isinstance(REFERENCE_IMAGE, str) or len(REFERENCE_IMAGE) > 5592408:
+    raise ValueError("Invalid reference portrait.")
 if not isinstance(NEGATIVE_PROMPT, str) or len(NEGATIVE_PROMPT) > 4000:
     raise ValueError("Invalid negative prompt.")
 if SCENE_ID is not None and (type(SCENE_ID) is not int or SCENE_ID <= 0):
@@ -124,7 +132,9 @@ if PRESET not in PRESETS:
 settings = PRESETS[PRESET].copy()
 UPSCALE_1080P = PRESET == "1080p"
 FPS = 8
-print(f"Scene: {SCENE_ID}; preset: {PRESET}; clip length: {settings['num_frames'] / FPS:.2f} seconds; seed: {SEED}")
+opening_frames = 25 if OPENING_PROMPT.strip() else 0
+expected_frames = settings["num_frames"] + opening_frames
+print(f"Scene: {SCENE_ID}; preset: {PRESET}; clip length: {expected_frames / FPS:.2f} seconds; seed: {SEED}")
 print(PROMPT)
 ''')
 markdown('''
@@ -133,9 +143,13 @@ markdown('''
 CogVideoX-5B uses BF16 on GPUs with native BF16 support (Ampere or newer) and FP16 otherwise (T4, P100). With less than 20 GiB VRAM the pipeline uses sequential CPU offloading, which fits a 16 GB GPU but is slow; larger GPUs use whole-model offloading. VAE slicing and tiling reduce decode memory. If an out-of-memory error occurs, restart the notebook session and try the `quick` preset. Do not assume a failed session produced a video.
 ''')
 code('''
+import base64
 import gc
+import io
 import time
-from diffusers import CogVideoXPipeline, CogVideoXDPMScheduler
+import numpy as np
+from PIL import Image, ImageOps
+from diffusers import CogVideoXPipeline, CogVideoXImageToVideoPipeline, CogVideoXDPMScheduler
 from diffusers.utils import export_to_video
 
 if "pipe" in globals():
@@ -143,33 +157,64 @@ if "pipe" in globals():
 gc.collect()
 torch.cuda.empty_cache()
 dtype = torch.bfloat16 if torch.cuda.get_device_capability(0)[0] >= 8 else torch.float16
-pipe = CogVideoXPipeline.from_pretrained(MODEL_ID, torch_dtype=dtype, low_cpu_mem_usage=True)
-pipe.scheduler = CogVideoXDPMScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
-if vram_gb >= 20:
-    pipe.enable_model_cpu_offload(gpu_id=0)
-else:
-    pipe.enable_sequential_cpu_offload(gpu_id=0)
-pipe.vae.enable_slicing()
-pipe.vae.enable_tiling()
-print(f"Loaded {MODEL_ID} in {dtype}.")
+def load_pipeline(pipeline, model, cache):
+    loaded = pipeline.from_pretrained(model, cache_dir=cache, torch_dtype=dtype, low_cpu_mem_usage=True)
+    loaded.scheduler = CogVideoXDPMScheduler.from_config(loaded.scheduler.config, timestep_spacing="trailing")
+    if vram_gb >= 20:
+        loaded.enable_model_cpu_offload(gpu_id=0)
+    else:
+        loaded.enable_sequential_cpu_offload(gpu_id=0)
+    loaded.vae.enable_slicing()
+    loaded.vae.enable_tiling()
+    print(f"Loaded {model} in {dtype}.")
+    return loaded
 
-started = time.monotonic()
-try:
+def render_shot(pipeline, prompt, seed, shot_settings, **conditioning):
+    started = time.monotonic()
     with torch.inference_mode():
-        frames = pipe(
-            prompt=PROMPT,
+        clip = pipeline(
+            prompt=prompt,
             negative_prompt=NEGATIVE_PROMPT,
             guidance_scale=6.0,
             use_dynamic_cfg=True,
             max_sequence_length=226,
             output_type="np",
-            generator=torch.Generator(device="cpu").manual_seed(SEED),
-            **settings,
+            generator=torch.Generator(device="cpu").manual_seed(seed),
+            **shot_settings,
+            **conditioning,
         ).frames[0]
+    if len(clip) != shot_settings["num_frames"] or not np.isfinite(clip).all():
+        raise RuntimeError("A shot returned invalid frames.")
+    print(f"Generated {len(clip)} frames in {time.monotonic() - started:.1f} seconds.")
+    return clip
+
+clips = []
+opening_cache = CACHE_DIR / "text-video"
+main_model = "zai-org/CogVideoX-5b-I2V" if REFERENCE_IMAGE else MODEL_ID
+try:
+    if opening_frames or not REFERENCE_IMAGE:
+        pipe = load_pipeline(CogVideoXPipeline, MODEL_ID, opening_cache)
+    if opening_frames:
+        opening_settings = {**settings, "num_frames": opening_frames, "num_inference_steps": 25}
+        clips.append(render_shot(pipe, OPENING_PROMPT, SEED ^ 0x9E3779B9, opening_settings))
+    if REFERENCE_IMAGE:
+        if opening_frames:
+            del pipe
+            gc.collect()
+            torch.cuda.empty_cache()
+            shutil.rmtree(opening_cache)
+        with Image.open(io.BytesIO(base64.b64decode(REFERENCE_IMAGE, validate=True))) as portrait:
+            if portrait.width * portrait.height > 16_000_000:
+                raise ValueError("The reference portrait is too large.")
+            reference = ImageOps.fit(ImageOps.exif_transpose(portrait).convert("RGB"), (settings["width"], settings["height"]), centering=(0.5, 0.35))
+        pipe = load_pipeline(CogVideoXImageToVideoPipeline, main_model, CACHE_DIR / "image-video")
+        clips.append(render_shot(pipe, PROMPT, SEED, settings, image=reference))
+    else:
+        clips.append(render_shot(pipe, PROMPT, SEED, settings))
 except torch.OutOfMemoryError:
     print("Out of GPU memory. Restart the session and try the quick preset.")
     raise
-print(f"Generated {len(frames)} frames in {time.monotonic() - started:.1f} seconds.")
+frames = np.concatenate(clips, axis=0) if opening_frames else clips[0]
 ''')
 markdown('''
 ## Save, preview, and download
@@ -185,7 +230,7 @@ import importlib.metadata
 import numpy as np
 import imageio_ffmpeg
 
-if len(frames) != settings["num_frames"] or not np.isfinite(frames).all():
+if len(frames) != expected_frames:
     raise RuntimeError("Invalid generated frames. No MP4 was exported.")
 output_dir = Path("/kaggle/working/cogvideox-output")
 output_dir.mkdir(parents=True, exist_ok=True)
@@ -214,9 +259,10 @@ if UPSCALE_1080P and tuple(output_metadata["size"]) != (1920, 1080):
     raise RuntimeError("Export did not produce 1920x1080 video.")
 manifest = {
     "format": "sorrydotcomeditor.wan-kaggle-result.v1",
-    "scene_id": SCENE_ID, "model": MODEL_ID, "preset": PRESET,
+    "scene_id": SCENE_ID, "model": main_model, "preset": PRESET,
     "prompt": PROMPT, "negative_prompt": NEGATIVE_PROMPT, "seed": SEED,
-    "fps": FPS, **settings, "gpu": gpu.name, "created_at": stamp,
+    "opening_prompt": OPENING_PROMPT, "opening_frames": opening_frames, "reference_used": bool(REFERENCE_IMAGE),
+    "fps": FPS, **settings, "num_frames": expected_frames, "gpu": gpu.name, "created_at": stamp,
     "video_file": video_path.name,
     "source_file": source_path.name,
     "output_width": output_metadata["size"][0], "output_height": output_metadata["size"][1],

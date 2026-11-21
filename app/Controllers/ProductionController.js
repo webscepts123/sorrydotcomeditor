@@ -1,6 +1,6 @@
 import { Controller } from "noderyx-framework";
 import { randomInt, randomUUID } from "node:crypto";
-import { mkdir, readFile, stat, statfs, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, stat, statfs, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { repositories } from "../Models/index.js";
 import { renderStudio } from "../Views/Studio.js";
@@ -169,6 +169,28 @@ async function completedMovieUrl(project) {
   try {
     const file = await stat(path.resolve(process.cwd(), url.slice(1)));
     return file.isFile() && file.size > 0 ? url : "";
+  } catch (error) {
+    if (["ENOENT", "ENOTDIR"].includes(error.code)) return "";
+    throw error;
+  }
+}
+
+async function readKagglePortrait(value) {
+  const url = mediaUrl(value);
+  const match = /^\/public\/(uploads|storage)\/.+\.(?:png|jpe?g|webp)$/i.exec(url);
+  if (!match) return "";
+  try {
+    const root = await realpath(path.resolve("public", match[1]));
+    const source = await realpath(path.resolve(url.slice(1)));
+    const relative = path.relative(root, source);
+    if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return "";
+    const file = await stat(source);
+    if (!file.isFile() || file.size < 12 || file.size > 4 * 1024 ** 2) return "";
+    const image = await readFile(source);
+    const png = image.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"));
+    const jpg = image.subarray(0, 3).equals(Buffer.from("ffd8ff", "hex"));
+    const webp = image.toString("ascii", 0, 4) === "RIFF" && image.toString("ascii", 8, 12) === "WEBP";
+    return png || jpg || webp ? image.toString("base64") : "";
   } catch (error) {
     if (["ENOENT", "ENOTDIR"].includes(error.code)) return "";
     throw error;
@@ -1185,8 +1207,9 @@ export class ProductionController extends Controller {
     const notebook = JSON.parse(await readFile(new URL("../../notebooks/cogvideox-kaggle.ipynb", import.meta.url), "utf8"));
     const cell = notebook.cells.find(cell => cell.cell_type === "code" && cell.source.join("").includes("if JOB_FILE:"));
     if (!cell) throw new Error("Notebook scene settings cell is missing.");
-    const encoded = Buffer.from(JSON.stringify(job), "utf8").toString("hex");
-    const settings = `editor_job = json.loads(bytes.fromhex("${encoded}").decode("utf-8"))\nSCENE_ID = editor_job["scene_id"]\nPROMPT = editor_job["prompt"]\nNEGATIVE_PROMPT = editor_job["negative_prompt"]\nPRESET = "1080p"\nSEED = editor_job["seed"]\n\n`;
+    const { reference_image: portrait = "", ...sceneJob } = job;
+    const encoded = Buffer.from(JSON.stringify(sceneJob), "utf8").toString("hex");
+    const settings = `editor_job = json.loads(bytes.fromhex("${encoded}").decode("utf-8"))\nSCENE_ID = editor_job["scene_id"]\nPROMPT = editor_job["prompt"]\nOPENING_PROMPT = editor_job.get("opening_prompt", "")\nREFERENCE_IMAGE = "${portrait}"\nNEGATIVE_PROMPT = editor_job["negative_prompt"]\nPRESET = "1080p"\nSEED = editor_job["seed"]\n\n`;
     cell.source = cell.source.join("").replace("if JOB_FILE:", `${settings}if JOB_FILE:`).split(/(?<=\n)/);
     return { sceneId: job.scene_id, body: JSON.stringify(notebook) };
   }
@@ -1194,18 +1217,32 @@ export class ProductionController extends Controller {
   async kaggleJob() {
     const scene = await this.findOwned("scenes", this.params.id);
     const project = await this.findOwned("projects", scene.project_id);
-    const characters = await this.db.query("SELECT c.name, c.role, c.description FROM characters c INNER JOIN character_scene cs ON cs.character_id = c.id WHERE cs.scene_id = ?", [scene.id]);
+    const characters = await this.db.query("SELECT c.name, c.role, c.description, c.image_path, c.reference_image FROM characters c INNER JOIN character_scene cs ON cs.character_id = c.id WHERE cs.scene_id = ? ORDER BY c.id", [scene.id]);
+    const source = String(scene.prompt || scene.script_segment || "");
+    const referenceName = /^Reference character:[ \t]*([^\r\n]+)$/im.exec(source)?.[1]?.trim() ?? "";
+    const action = source.replace(/^Reference character:[^\r\n]*(?:\r?\n|$)/im, "").trim();
+    const shots = /^Opening shot:[ \t]*([\s\S]+?)\r?\nMain shot:[ \t]*([\s\S]+)$/i.exec(action);
+    const opening = shots?.[1].trim() ?? "";
+    let portrait = "";
+    if (referenceName) {
+      const character = characters.find(person => person.name?.toLowerCase() === referenceName.toLowerCase());
+      portrait = await readKagglePortrait(character?.image_path || character?.reference_image);
+      if (!portrait) {
+        this.abort(422, "Assign the reference character to this scene and add a PNG, JPEG, or WebP portrait under 4 MB.");
+        return null;
+      }
+    }
     const prompt = [
-      scene.prompt || scene.script_segment,
+      shots?.[2].trim() ?? action,
       project.style_preset ? `Visual style: ${project.style_preset}.` : "Cinematic live-action video.",
       characters.length ? `Cast: ${characters.map(character => `${character.name} (${character.role || "supporting"}): ${character.description || ""}`).join("; ")}` : "",
       "Natural motion, coherent anatomy, film lighting, no subtitles or watermarks."
     ].filter(Boolean).join("\n\n");
-    if (prompt.length > 12000) {
+    if (prompt.length + opening.length > 12000) {
       this.abort(422, "This scene prompt is too long for the Kaggle notebook. Shorten the scene or cast descriptions first.");
       return null;
     }
-    return { format: "sorrydotcomeditor.wan-kaggle.v1", scene_id: Number(scene.id), project_id: Number(scene.project_id), prompt, negative_prompt: "low quality, blurry, distorted faces, extra limbs, cartoon, watermark, text, subtitles", preset: "1080p", seed: 42 };
+    return { format: "sorrydotcomeditor.wan-kaggle.v1", scene_id: Number(scene.id), project_id: Number(scene.project_id), prompt, ...(opening && { opening_prompt: opening }), ...(portrait && { reference_image: portrait }), negative_prompt: "low quality, blurry, distorted faces, extra limbs, cartoon, watermark, text, subtitles", preset: "1080p", seed: 42 };
   }
 
   async renderLocalScene() {

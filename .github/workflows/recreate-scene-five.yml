@@ -1,0 +1,83 @@
+﻿name: Queue the revised Scene 5 render
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/recreate-scene-five.yml]
+permissions:
+  contents: read
+jobs:
+  recreate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Queue Scene 5 on the live studio
+        id: result
+        env:
+          CPANEL_KEY: ${{ secrets.CPANEL_KEY }}
+          CPANEL_KNOWN_HOSTS: ${{ secrets.CPANEL_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$CPANEL_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$CPANEL_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          result="$(ssh -o BatchMode=yes -o StrictHostKeyChecking=yes studiosorrydotco@studio.sorrydotcom.lk 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          export LD_LIBRARY_PATH="$HOME/.local${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          base="$HOME/apps/sorrydotcomeditor"
+          for attempt in {1..36}; do
+            if grep -Fq 'CogVideoXImageToVideoPipeline' "$base/current/notebooks/cogvideox-kaggle.ipynb"; then break; fi
+            sleep 5
+          done
+          cd "$base/current"
+          grep -Fq 'CogVideoXImageToVideoPipeline' notebooks/cogvideox-kaggle.ipynb
+          "$HOME/.local/node/bin/node" --input-type=module <<'NODE'
+          import { randomInt } from 'node:crypto';
+          import { connect, loadEnvironment } from 'noderyx-framework';
+          import { ProductionController } from './app/Controllers/ProductionController.js';
+          import { KaggleApiService } from './app/Services/KaggleApiService.js';
+          loadEnvironment();
+          const { default: config } = await import('./noderyx.config.js');
+          const db = await connect(config.database);
+          const run = async () => {
+            const [scene] = await db.query("SELECT s.*,p.user_id FROM scenes s JOIN projects p ON p.id=s.project_id WHERE s.id=? AND s.order_index=?", [5,3]);
+            if (!scene || scene.status !== 'Ready' || scene.generation_job_id || !/^uploads\/scenes\/kaggle-5-/.test(scene.video_path || '')) return 'scene-not-ready-for-recreation';
+            const characters = await db.query("SELECT c.name FROM characters c JOIN character_scene cs ON cs.character_id=c.id WHERE cs.scene_id=? AND (NULLIF(c.image_path,'') IS NOT NULL OR NULLIF(c.reference_image,'') IS NOT NULL)", [scene.id]);
+            if (characters.length !== 1) return 'reference-portrait-needs-selection';
+            const service = new KaggleApiService({ database: db });
+            if (!(await service.credentials(scene.user_id))) return 'kaggle-connection-missing';
+            const prompt = [
+              'Opening shot: Wide cinematic view over Colombo, Sri Lanka, at golden dawn. The Lotus Tower rises above the city skyline near Beira Lake, with lush trees, low-rise rooftops, and warm morning haze. A slow, steady aerial glide establishes the city.',
+              'Main shot: A bright eye-level shot in the front room of a Sri Lankan house. The hero from the reference portrait faces the camera, his eyes and facial features sharply visible in soft daylight. Two Sri Lankan police officers in khaki uniforms step into view behind him. Hold the hero and the officers in a well-lit composition as an officer tells him he is under arrest. Photorealistic, steady camera, natural skin texture, clear faces, restrained movement.',
+              'Reference character: ' + characters[0].name
+            ].join('\n');
+            const controller = new ProductionController({
+              params: { id: String(scene.id) },
+              session: { userId: scene.user_id },
+              service: name => name === 'db' ? db : service,
+              abort: () => { throw new Error('reference-or-scene-invalid'); },
+            });
+            const findOwned = controller.findOwned.bind(controller);
+            controller.findOwned = async (type,id) => {
+              const owned = await findOwned(type,id);
+              return type === 'scenes' && Number(owned.id) === Number(scene.id) ? { ...owned, prompt } : owned;
+            };
+            const notebook = await controller.kaggleNotebookDocument({ seed: randomInt(2 ** 32) });
+            if (!notebook?.body) return 'notebook-could-not-be-prepared';
+            const saved = await db.query("UPDATE scenes SET prompt=? WHERE id=? AND status='Ready' AND generation_job_id IS NULL AND video_path=? AND prompt <=> ?", [prompt,scene.id,scene.video_path,scene.prompt ?? null]);
+            if (!saved.affectedRows) return 'scene-changed-during-preparation';
+            const job = await service.submit(scene.user_id, scene, notebook.body);
+            return job.status === 'Rendering' ? 'scene-5-queued-with-opening-shot-and-portrait' : 'submission-unconfirmed';
+          };
+          try { console.log(await run()); }
+          catch (error) {
+            console.log(/reference-or-scene-invalid/.test(error.message) ? 'reference-portrait-unavailable' : /GPU|quota/i.test(error.message) ? 'kaggle-gpu-request-failed' : /credential|token|username/i.test(error.message) ? 'kaggle-authentication-failed' : /timed out/i.test(error.message) ? 'kaggle-submission-timeout' : 'scene-recreation-failed');
+          }
+          process.exit(0);
+          NODE
+          REMOTE
+          )"
+          printf 'summary=%s\n' "$result" >> "$GITHUB_OUTPUT"
+      - name: "${{ steps.result.outputs.summary }}"
+        run: echo 'Only the submission outcome is reported.'
+
