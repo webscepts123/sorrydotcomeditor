@@ -1,0 +1,58 @@
+﻿name: Check live Scene 5 Kaggle run
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/check-scene-kaggle.yml]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read provider status
+        id: result
+        env:
+          CPANEL_KEY: ${{ secrets.CPANEL_KEY }}
+          CPANEL_KNOWN_HOSTS: ${{ secrets.CPANEL_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$CPANEL_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$CPANEL_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          result="$(ssh -o BatchMode=yes -o StrictHostKeyChecking=yes studiosorrydotco@studio.sorrydotcom.lk 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          export LD_LIBRARY_PATH="$HOME/.local${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          cd ~/apps/sorrydotcomeditor/current
+          "$HOME/.local/node/bin/node" --input-type=module <<'NODE'
+          import { connect, loadEnvironment } from 'noderyx-framework';
+          import { KaggleApiService } from './app/Services/KaggleApiService.js';
+          loadEnvironment();
+          const { default: config } = await import('./noderyx.config.js');
+          const db = await connect(config.database);
+          const [scene] = await db.query('SELECT s.status,s.generation_job_id,s.video_path,s.updated_at,p.user_id FROM scenes s JOIN projects p ON p.id=s.project_id WHERE s.id=?',[5]);
+          const redact = value => /^[a-z0-9_-]{1,32}$/i.test(value || '') ? value : 'unknown';
+          let provider = 'no-kaggle-job';
+          if (scene?.generation_job_id?.startsWith('kaggle:')) {
+            const service = new KaggleApiService({ database: db });
+            try {
+              const credentials = await service.credentials(scene.user_id);
+              if (!credentials) provider = 'connection-missing';
+              else {
+                const { status } = await service.run({ action:'status', credentials, kernel:scene.generation_job_id.slice(7) }, 35000);
+                provider = redact(status);
+              }
+            } catch (error) {
+              provider = /rejected|accept|username|credential/i.test(error.message) ? 'authentication-error' : /denied/i.test(error.message) ? 'permission-error' : /timed out/i.test(error.message) ? 'timeout' : 'provider-check-error';
+            }
+          }
+          const minutes = scene?.updated_at ? Math.max(0, Math.round((Date.now() - new Date(scene.updated_at).getTime()) / 60000)) : 0;
+          console.log(`Scene ${redact(scene?.status)} - Kaggle ${provider} - last updated ${minutes} minutes ago - ${scene?.video_path ? 'clip attached' : 'no clip'}`);
+          process.exit(0);
+          NODE
+          REMOTE
+          )"
+          printf 'summary=%s\n' "$result" >> "$GITHUB_OUTPUT"
+      - name: "${{ steps.result.outputs.summary }}"
+        run: echo 'Only status and age are reported.'
+
