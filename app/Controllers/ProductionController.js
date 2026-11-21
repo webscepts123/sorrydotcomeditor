@@ -1,5 +1,5 @@
 import { Controller } from "noderyx-framework";
-import { randomInt, randomUUID } from "node:crypto";
+import { createHash, randomInt, randomUUID } from "node:crypto";
 import { mkdir, readFile, realpath, stat, statfs, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { repositories } from "../Models/index.js";
@@ -190,7 +190,12 @@ async function readKagglePortrait(value) {
     const png = image.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex"));
     const jpg = image.subarray(0, 3).equals(Buffer.from("ffd8ff", "hex"));
     const webp = image.toString("ascii", 0, 4) === "RIFF" && image.toString("ascii", 8, 12) === "WEBP";
-    return png || jpg || webp ? image.toString("base64") : "";
+    if (!png && !jpg && !webp) return null;
+    const appUrl = process.env.APP_URL;
+    if (appUrl?.startsWith("https://")) {
+      return { reference_url: new URL(url, appUrl).href, reference_sha256: createHash("sha256").update(image).digest("hex") };
+    }
+    return { reference_image: image.toString("base64") };
   } catch (error) {
     if (["ENOENT", "ENOTDIR"].includes(error.code)) return "";
     throw error;
@@ -1209,7 +1214,7 @@ export class ProductionController extends Controller {
     if (!cell) throw new Error("Notebook scene settings cell is missing.");
     const { reference_image: portrait = "", ...sceneJob } = job;
     const encoded = Buffer.from(JSON.stringify(sceneJob), "utf8").toString("hex");
-    const settings = `editor_job = json.loads(bytes.fromhex("${encoded}").decode("utf-8"))\nSCENE_ID = editor_job["scene_id"]\nPROMPT = editor_job["prompt"]\nOPENING_PROMPT = editor_job.get("opening_prompt", "")\nREFERENCE_IMAGE = "${portrait}"\nNEGATIVE_PROMPT = editor_job["negative_prompt"]\nPRESET = "1080p"\nSEED = editor_job["seed"]\n\n`;
+    const settings = `editor_job = json.loads(bytes.fromhex("${encoded}").decode("utf-8"))\nSCENE_ID = editor_job["scene_id"]\nPROMPT = editor_job["prompt"]\nOPENING_PROMPT = editor_job.get("opening_prompt", "")\nREFERENCE_IMAGE = "${portrait}"\nREFERENCE_URL = editor_job.get("reference_url", "")\nREFERENCE_SHA256 = editor_job.get("reference_sha256", "")\nNEGATIVE_PROMPT = editor_job["negative_prompt"]\nPRESET = "1080p"\nSEED = editor_job["seed"]\n\n`;
     cell.source = cell.source.join("").replace("if JOB_FILE:", `${settings}if JOB_FILE:`).split(/(?<=\n)/);
     return { sceneId: job.scene_id, body: JSON.stringify(notebook) };
   }
@@ -1223,7 +1228,7 @@ export class ProductionController extends Controller {
     const action = source.replace(/^Reference character:[^\r\n]*(?:\r?\n|$)/im, "").trim();
     const shots = /^Opening shot:[ \t]*([\s\S]+?)\r?\nMain shot:[ \t]*([\s\S]+)$/i.exec(action);
     const opening = shots?.[1].trim() ?? "";
-    let portrait = "";
+    let portrait = null;
     if (referenceName) {
       const character = characters.find(person => person.name?.toLowerCase() === referenceName.toLowerCase());
       portrait = await readKagglePortrait(character?.image_path || character?.reference_image);
@@ -1242,7 +1247,7 @@ export class ProductionController extends Controller {
       this.abort(422, "This scene prompt is too long for the Kaggle notebook. Shorten the scene or cast descriptions first.");
       return null;
     }
-    return { format: "sorrydotcomeditor.wan-kaggle.v1", scene_id: Number(scene.id), project_id: Number(scene.project_id), prompt, ...(opening && { opening_prompt: opening }), ...(portrait && { reference_image: portrait }), negative_prompt: "low quality, blurry, distorted faces, extra limbs, cartoon, watermark, text, subtitles", preset: "1080p", seed: 42 };
+    return { format: "sorrydotcomeditor.wan-kaggle.v1", scene_id: Number(scene.id), project_id: Number(scene.project_id), prompt, ...(opening && { opening_prompt: opening }), ...portrait, negative_prompt: "low quality, blurry, distorted faces, extra limbs, cartoon, watermark, text, subtitles", preset: "1080p", seed: 42 };
   }
 
   async renderLocalScene() {

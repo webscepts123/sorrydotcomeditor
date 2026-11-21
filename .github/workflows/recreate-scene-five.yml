@@ -26,13 +26,14 @@ jobs:
           export LD_LIBRARY_PATH="$HOME/.local${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           base="$HOME/apps/sorrydotcomeditor"
           for attempt in {1..36}; do
-            if grep -Fq 'CogVideoXImageToVideoPipeline' "$base/current/notebooks/cogvideox-kaggle.ipynb"; then break; fi
+            if grep -Fq 'REFERENCE_SHA256' "$base/current/notebooks/cogvideox-kaggle.ipynb"; then break; fi
             sleep 5
           done
           cd "$base/current"
-          grep -Fq 'CogVideoXImageToVideoPipeline' notebooks/cogvideox-kaggle.ipynb
+          grep -Fq 'REFERENCE_SHA256' notebooks/cogvideox-kaggle.ipynb
           "$HOME/.local/node/bin/node" --input-type=module <<'NODE'
           import { randomInt } from 'node:crypto';
+          import { spawnSync } from 'node:child_process';
           import { connect, loadEnvironment } from 'noderyx-framework';
           import { ProductionController } from './app/Controllers/ProductionController.js';
           import { KaggleApiService } from './app/Services/KaggleApiService.js';
@@ -41,13 +42,34 @@ jobs:
           const db = await connect(config.database);
           let phase = 'read-scene';
           const run = async () => {
-            const [scene] = await db.query("SELECT s.*,p.user_id FROM scenes s JOIN projects p ON p.id=s.project_id WHERE s.id=? AND s.order_index=?", [5,3]);
+            let [scene] = await db.query("SELECT s.*,p.user_id FROM scenes s JOIN projects p ON p.id=s.project_id WHERE s.id=? AND s.order_index=?", [5,3]);
             if (scene?.generation_job_id?.startsWith('kaggle:') && String(scene.prompt).startsWith('Opening shot:')) {
               const service = new KaggleApiService({ database: db });
               const credentials = await service.credentials(scene.user_id);
+              if (!credentials) return 'kaggle-connection-missing';
               phase = 'existing-kaggle-job';
-              const job = await service.run({ action:'status', credentials, kernel:scene.generation_job_id.slice(7) });
-              return 'recreation-' + (/^[a-z_]+$/.test(job.status) ? job.status : 'unknown-status');
+              const python = process.env.KAGGLE_PYTHON || '../../shared/kaggle-venv/bin/python';
+              const source = [
+                "import contextlib, importlib.util, io, json, sys",
+                "spec = importlib.util.spec_from_file_location('bridge', 'scripts/kaggle-api.py')",
+                "bridge = importlib.util.module_from_spec(spec)",
+                "spec.loader.exec_module(bridge)",
+                "payload = json.load(sys.stdin)",
+                "try:",
+                "    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):",
+                "        result = bridge.run(payload)",
+                "    print(json.dumps(result))",
+                "except Exception as exc:",
+                "    status = getattr(getattr(exc, 'response', None), 'status_code', None)",
+                "    print(json.dumps({'http': status, 'kind': type(exc).__name__}))",
+              ].join('\n');
+              const checked = spawnSync(python, ['-c', source], { input:JSON.stringify({ action:'status', credentials, kernel:scene.generation_job_id.slice(7) }), encoding:'utf8', timeout:45000 });
+              const result = JSON.parse(checked.stdout || '{}');
+              if (typeof result.status === 'string' && /^[a-z_]+$/.test(result.status)) return 'recreation-' + result.status;
+              if (result.http !== 404 || !scene.generation_error) return 'previous-submission-status-' + (result.http || result.kind || 'unconfirmed');
+              const recovered = await db.query("UPDATE scenes SET status='Ready',generation_job_id=NULL,generation_error=NULL WHERE id=? AND generation_job_id=? AND status IN ('Rendering','Processing')", [scene.id,scene.generation_job_id]);
+              if (!recovered.affectedRows) return 'scene-changed-during-recovery';
+              scene = { ...scene, status:'Ready', generation_job_id:null };
             }
             if (!scene || scene.status !== 'Ready' || scene.generation_job_id || !/^uploads\/scenes\/kaggle-5-/.test(scene.video_path || '')) return 'scene-not-ready-for-recreation';
             const characters = await db.query("SELECT c.name FROM characters c JOIN character_scene cs ON cs.character_id=c.id WHERE cs.scene_id=? AND (NULLIF(c.image_path,'') IS NOT NULL OR NULLIF(c.reference_image,'') IS NOT NULL)", [scene.id]);
@@ -59,6 +81,7 @@ jobs:
               'Main shot: A bright eye-level shot in the front room of a Sri Lankan house. The hero from the reference portrait faces the camera, his eyes and facial features sharply visible in soft daylight. Two Sri Lankan police officers in khaki uniforms step into view behind him. Hold the hero and the officers in a well-lit composition as an officer tells him he is under arrest. Photorealistic, steady camera, natural skin texture, clear faces, restrained movement.',
               'Reference character: ' + characters[0].name
             ].join('\n');
+            process.env.APP_URL = 'https://studio.sorrydotcom.lk';
             const controller = new ProductionController({
               params: { id: String(scene.id) },
               session: { userId: scene.user_id },
@@ -75,7 +98,7 @@ jobs:
             if (!notebook?.body) return 'notebook-could-not-be-prepared';
             phase = 'save-prompt';
             const saved = await db.query("UPDATE scenes SET prompt=? WHERE id=? AND status='Ready' AND generation_job_id IS NULL AND video_path=? AND prompt <=> ?", [prompt,scene.id,scene.video_path,scene.prompt ?? null]);
-            if (!saved.affectedRows) return 'scene-changed-during-preparation';
+            if (!saved.affectedRows && scene.prompt !== prompt) return 'scene-changed-during-preparation';
             phase = 'submit-to-kaggle';
             const job = await service.submit(scene.user_id, scene, notebook.body);
             return job.status === 'Rendering' ? 'scene-5-queued-with-opening-shot-and-portrait' : 'submission-unconfirmed';

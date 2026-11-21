@@ -90,6 +90,8 @@ SCENE_ID = None  # Replace with your editor's scene ID, if known.
 PROMPT = "A cinematic shot of a quiet railway platform at sunrise, soft golden light, a woman waits beside a vintage train, natural human movement, slow camera dolly forward."
 OPENING_PROMPT = ""
 REFERENCE_IMAGE = ""  # Optional base64 portrait supplied by the studio.
+REFERENCE_URL = ""
+REFERENCE_SHA256 = ""
 NEGATIVE_PROMPT = "low quality, blurry, distorted faces, extra limbs, cartoon, watermark, text, subtitles"
 PRESET = "1080p"  # quick, 480p (native 720x480), or 1080p (720x480 generation + upscale)
 SEED = 42
@@ -105,6 +107,8 @@ if JOB_FILE:
     PROMPT = job.get("prompt", "")
     OPENING_PROMPT = job.get("opening_prompt", "")
     REFERENCE_IMAGE = job.get("reference_image", "")
+    REFERENCE_URL = job.get("reference_url", "")
+    REFERENCE_SHA256 = job.get("reference_sha256", "")
     NEGATIVE_PROMPT = job.get("negative_prompt", NEGATIVE_PROMPT)
     PRESET = job.get("preset", "1080p")
     SEED = job.get("seed", 42)
@@ -115,6 +119,8 @@ if not isinstance(OPENING_PROMPT, str) or len(OPENING_PROMPT) > 12000:
     raise ValueError("Invalid opening shot prompt.")
 if not isinstance(REFERENCE_IMAGE, str) or len(REFERENCE_IMAGE) > 5592408:
     raise ValueError("Invalid reference portrait.")
+if REFERENCE_URL and (not isinstance(REFERENCE_URL, str) or not REFERENCE_URL.startswith("https://") or len(REFERENCE_SHA256) != 64):
+    raise ValueError("Invalid studio portrait URL or checksum.")
 if not isinstance(NEGATIVE_PROMPT, str) or len(NEGATIVE_PROMPT) > 4000:
     raise ValueError("Invalid negative prompt.")
 if SCENE_ID is not None and (type(SCENE_ID) is not int or SCENE_ID <= 0):
@@ -145,8 +151,10 @@ CogVideoX-5B uses BF16 on GPUs with native BF16 support (Ampere or newer) and FP
 code('''
 import base64
 import gc
+import hashlib
 import io
 import time
+from urllib.request import urlopen
 import numpy as np
 from PIL import Image, ImageOps
 from diffusers import CogVideoXPipeline, CogVideoXImageToVideoPipeline, CogVideoXDPMScheduler
@@ -190,23 +198,32 @@ def render_shot(pipeline, prompt, seed, shot_settings, **conditioning):
 
 clips = []
 opening_cache = CACHE_DIR / "text-video"
-main_model = "zai-org/CogVideoX-5b-I2V" if REFERENCE_IMAGE else MODEL_ID
+has_reference = bool(REFERENCE_IMAGE or REFERENCE_URL)
+main_model = "zai-org/CogVideoX-5b-I2V" if has_reference else MODEL_ID
+if has_reference:
+    if REFERENCE_URL:
+        with urlopen(REFERENCE_URL, timeout=30) as response:
+            portrait_bytes = response.read(4 * 1024 ** 2 + 1)
+        if len(portrait_bytes) > 4 * 1024 ** 2 or hashlib.sha256(portrait_bytes).hexdigest() != REFERENCE_SHA256:
+            raise ValueError("The studio portrait changed. Recreate the notebook with the current portrait.")
+    else:
+        portrait_bytes = base64.b64decode(REFERENCE_IMAGE, validate=True)
+    with Image.open(io.BytesIO(portrait_bytes)) as portrait:
+        if portrait.width * portrait.height > 16_000_000:
+            raise ValueError("The reference portrait is too large.")
+        reference = ImageOps.fit(ImageOps.exif_transpose(portrait).convert("RGB"), (settings["width"], settings["height"]), centering=(0.5, 0.35))
 try:
-    if opening_frames or not REFERENCE_IMAGE:
+    if opening_frames or not has_reference:
         pipe = load_pipeline(CogVideoXPipeline, MODEL_ID, opening_cache)
     if opening_frames:
         opening_settings = {**settings, "num_frames": opening_frames, "num_inference_steps": 25}
         clips.append(render_shot(pipe, OPENING_PROMPT, SEED ^ 0x9E3779B9, opening_settings))
-    if REFERENCE_IMAGE:
+    if has_reference:
         if opening_frames:
             del pipe
             gc.collect()
             torch.cuda.empty_cache()
             shutil.rmtree(opening_cache)
-        with Image.open(io.BytesIO(base64.b64decode(REFERENCE_IMAGE, validate=True))) as portrait:
-            if portrait.width * portrait.height > 16_000_000:
-                raise ValueError("The reference portrait is too large.")
-            reference = ImageOps.fit(ImageOps.exif_transpose(portrait).convert("RGB"), (settings["width"], settings["height"]), centering=(0.5, 0.35))
         pipe = load_pipeline(CogVideoXImageToVideoPipeline, main_model, CACHE_DIR / "image-video")
         clips.append(render_shot(pipe, PROMPT, SEED, settings, image=reference))
     else:
@@ -261,7 +278,7 @@ manifest = {
     "format": "sorrydotcomeditor.wan-kaggle-result.v1",
     "scene_id": SCENE_ID, "model": main_model, "preset": PRESET,
     "prompt": PROMPT, "negative_prompt": NEGATIVE_PROMPT, "seed": SEED,
-    "opening_prompt": OPENING_PROMPT, "opening_frames": opening_frames, "reference_used": bool(REFERENCE_IMAGE),
+    "opening_prompt": OPENING_PROMPT, "opening_frames": opening_frames, "reference_used": has_reference,
     "fps": FPS, **settings, "num_frames": expected_frames, "gpu": gpu.name, "created_at": stamp,
     "video_file": video_path.name,
     "source_file": source_path.name,

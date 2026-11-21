@@ -41,7 +41,13 @@ def run(data):
             api.kernels_list(mine=True, page_size=1)
             return {"connected": True}
         if action == "submit":
-            result = api.kernels_push(data["directory"], acc="NvidiaTeslaT4")
+            try:
+                result = api.kernels_push(data["directory"], acc="NvidiaTeslaT4")
+            except Exception as error:
+                status = getattr(getattr(error, "response", None), "status_code", None)
+                if status in (400, 413, 422):
+                    raise BridgeError("Kaggle rejected the notebook file. Check its size and scene settings.") from None
+                raise
             if result is None or getattr(result, "error", None):
                 raise BridgeError("Kaggle rejected the notebook. Check GPU access and account verification.")
             return {"submitted": True}
