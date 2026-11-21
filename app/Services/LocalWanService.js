@@ -4,7 +4,8 @@ export class LocalWanService extends ComfyVideoService {
   constructor() {
     super({
       baseUrl: process.env.WAN_LOCAL_URL || "http://127.0.0.1:8188",
-      workflowPath: process.env.WAN_LOCAL_WORKFLOW || "database/workflows/wan21-local-api.json"
+      workflowPath: process.env.WAN_LOCAL_WORKFLOW || "database/workflows/wan21-local-api.json",
+      allowTestWorkflow: true
     });
     const url = new URL(this.baseUrl);
     if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) {

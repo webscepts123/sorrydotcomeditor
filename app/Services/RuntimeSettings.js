@@ -29,7 +29,7 @@ function workflowPath(value) {
 
 export const RUNTIME_SETTINGS = [
   { name: "COMFYUI_URL", label: "ComfyUI server URL", group: "comfy", placeholder: "https://your-comfyui-host:8188", help: "Remote ComfyUI used by \"Queue ComfyUI render\". Leave empty to disable.", validate: (value) => httpUrl(value) },
-  { name: "COMFYUI_VIDEO_WORKFLOW", label: "ComfyUI workflow", group: "comfy", workflow: true, fallback: "storage/workflows/wan_video_api.json", help: "API-format workflow JSON sent to ComfyUI.", validate: workflowPath },
+  { name: "COMFYUI_VIDEO_WORKFLOW", label: "ComfyUI workflow", group: "comfy", workflow: true, fallback: "storage/workflows/wan_video_api.json", help: "Select a production video workflow in API JSON format. wan21-local-api.json is a one-second compatibility test.", validate: workflowPath },
   { name: "WAN_LOCAL_URL", label: "Local Wan 2.1 URL", group: "local", fallback: "http://127.0.0.1:8188", placeholder: "http://127.0.0.1:8188", help: "ComfyUI running on this machine (npm run wan:start).", validate: (value) => httpUrl(value, { loopback: true }) },
   { name: "WAN_LOCAL_WORKFLOW", label: "Local Wan workflow", group: "local", workflow: true, fallback: "database/workflows/wan21-local-api.json", help: "API-format workflow JSON for the local worker.", validate: workflowPath }
 ];

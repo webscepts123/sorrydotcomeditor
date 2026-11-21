@@ -8,7 +8,7 @@ function replaceTokens(value, tokens) {
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, replaceTokens(item, tokens)]));
   }
   if (typeof value !== "string") return value;
-  return Object.entries(tokens).reduce((result, [token, replacement]) => result.replaceAll(token, replacement), value);
+  return value.replace(/\{\{(?:PROMPT|NEGATIVE_PROMPT)\}\}/g, token => tokens[token]);
 }
 
 async function responseJson(response, message) {
@@ -21,14 +21,28 @@ async function responseJson(response, message) {
 
 export class ComfyRenderFailedError extends Error {}
 
+export class ComfyTestWorkflowError extends Error {
+  constructor() {
+    super("The selected ComfyUI workflow is a 256×256, one-second compatibility test. Use Generate on Kaggle or choose a production video workflow in Settings.");
+  }
+}
+
 export class ComfyVideoService {
-  constructor({ baseUrl = process.env.COMFYUI_URL, workflowPath = process.env.COMFYUI_VIDEO_WORKFLOW } = {}) {
+  constructor({ baseUrl = process.env.COMFYUI_URL, workflowPath = process.env.COMFYUI_VIDEO_WORKFLOW, allowTestWorkflow = false } = {}) {
     this.baseUrl = String(baseUrl ?? "").replace(/\/+$/, "");
     this.workflowPath = path.resolve(process.cwd(), workflowPath || "storage/workflows/wan_video_api.json");
+    this.allowTestWorkflow = allowTestWorkflow;
     if (!this.baseUrl) throw new Error("Set COMFYUI_URL to enable ComfyUI rendering.");
   }
 
+  assertSceneWorkflow() {
+    if (!this.allowTestWorkflow && path.basename(this.workflowPath).toLowerCase() === "wan21-local-api.json") {
+      throw new ComfyTestWorkflowError();
+    }
+  }
+
   async submitScene(scene, cast = []) {
+    this.assertSceneWorkflow();
     const raw = await readFile(this.workflowPath, "utf8").catch((error) => {
       if (error.code === "ENOENT") throw new Error(`ComfyUI workflow not found: ${this.workflowPath}`);
       throw error;
@@ -40,10 +54,9 @@ export class ComfyVideoService {
 
     workflow = replaceTokens(workflow, {
       "{{PROMPT}}": [
-        "Create a photorealistic live-action cinematic cutscene with natural movement, film lighting and professional camera work.",
-        `Scene action: ${scene.prompt || scene.script_segment || ""}`,
-        cast.length ? `Cast continuity:\n${cast.map((character) => `${character.name} (${character.role ?? "supporting"}): ${character.description ?? ""}\n${character.personality ?? ""}`).join("\n\n")}` : "",
-        "No animation, cartoons, illustrations, game graphics, subtitles, logos, or watermarks."
+        String(scene.prompt || scene.script_segment || "").trim(),
+        "Photorealistic live-action footage with natural motion and cinematic lighting.",
+        cast.length ? `Cast appearance: ${cast.map((character) => `${character.name} (${character.role ?? "supporting"}): ${character.description ?? ""}`).join("; ")}` : ""
       ].filter(Boolean).join("\n\n"),
       "{{NEGATIVE_PROMPT}}": "cartoon, anime, illustration, low quality, blurry, distorted faces, extra limbs, watermark, text"
     });

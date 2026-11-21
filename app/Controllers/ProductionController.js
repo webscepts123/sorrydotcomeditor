@@ -7,7 +7,7 @@ import { renderStudio } from "../Views/Studio.js";
 import { renderProductionEditor } from "../Views/ProductionEditor.js";
 import { mediaUrl } from "../Views/studio-helpers.js";
 import { createNotebookTransfer, readNotebookTransfer } from "../Services/KaggleNotebookTransfer.js";
-import { ComfyRenderFailedError } from "../Services/ComfyVideoService.js";
+import { ComfyRenderFailedError, ComfyTestWorkflowError } from "../Services/ComfyVideoService.js";
 import { RUNTIME_SETTINGS, listWorkflows, runtimeSettingsView, saveRuntimeSettings } from "../Services/RuntimeSettings.js";
 
 const resourceDefinitions = {
@@ -1165,8 +1165,8 @@ export class ProductionController extends Controller {
     const project = await this.findOwned("projects", scene.project_id);
     const characters = await this.db.query("SELECT c.name, c.role, c.description FROM characters c INNER JOIN character_scene cs ON cs.character_id = c.id WHERE cs.scene_id = ?", [scene.id]);
     const prompt = [
-      project.style_preset ? `Visual style: ${project.style_preset}.` : "Cinematic live-action video.",
       scene.prompt || scene.script_segment,
+      project.style_preset ? `Visual style: ${project.style_preset}.` : "Cinematic live-action video.",
       characters.length ? `Cast: ${characters.map(character => `${character.name} (${character.role || "supporting"}): ${character.description || ""}`).join("; ")}` : "",
       "Natural motion, coherent anatomy, film lighting, no subtitles or watermarks."
     ].filter(Boolean).join("\n\n");
@@ -1181,9 +1181,9 @@ export class ProductionController extends Controller {
     return this.renderScene("local");
   }
 
-  unavailableComfyRender(location) {
-    const message = "ComfyUI has no connected worker. Open AI Engine to generate on Kaggle, or connect a ComfyUI worker in Settings.";
-    if (!this.wantsHtml) return this.json({ message }, 503);
+  unavailableComfyRender(location, error) {
+    const message = error?.message ?? "ComfyUI has no connected worker. Open AI Engine to generate on Kaggle, or connect a ComfyUI worker in Settings.";
+    if (!this.wantsHtml) return this.json({ message }, error ? 422 : 503);
     flash(this.context, message);
     return redirect(this.context, location);
   }
@@ -1207,6 +1207,7 @@ export class ProductionController extends Controller {
       const service = local ? this.service("comfyLocal")() : this.comfy;
       jobId = await service.submitScene(scene, characters);
     } catch (error) {
+      if (error instanceof ComfyTestWorkflowError) return this.unavailableComfyRender(`/scenes/${scene.id}`, error);
       return this.abort(503, `${local ? "Local Wan 2.1" : "ComfyUI"} could not queue the scene: ${error.message}`);
     }
     await this.models.scenes.update(scene.id, { status: "Rendering", generation_job_id: local ? `local:${jobId}` : jobId, generation_error: null });
@@ -1295,6 +1296,13 @@ export class ProductionController extends Controller {
   async renderBatch() {
     const project = await this.findOwned("projects", this.params.id);
     if (!this.comfyConfigured) return this.unavailableComfyRender(`/projects/${project.id}`);
+    const service = this.comfy;
+    try {
+      service.assertSceneWorkflow();
+    } catch (error) {
+      if (!(error instanceof ComfyTestWorkflowError)) throw error;
+      return this.unavailableComfyRender(`/projects/${project.id}`, error);
+    }
     const scenes = await this.db.query("SELECT * FROM scenes WHERE project_id = ? AND status NOT IN ('Rendering', 'Processing') ORDER BY order_index, id", [project.id]);
     let queued = 0;
     for (const scene of scenes) {
@@ -1303,7 +1311,7 @@ export class ProductionController extends Controller {
           "SELECT c.* FROM characters c INNER JOIN character_scene cs ON cs.character_id = c.id WHERE cs.scene_id = ?",
           [scene.id]
         );
-        const jobId = await this.comfy.submitScene(scene, characters);
+        const jobId = await service.submitScene(scene, characters);
         await this.models.scenes.update(scene.id, { status: "Rendering", generation_job_id: jobId, generation_error: null });
         queued += 1;
       } catch (error) {

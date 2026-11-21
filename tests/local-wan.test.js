@@ -5,6 +5,26 @@ import { LocalWanService } from "../app/Services/LocalWanService.js";
 import { ComfyVideoService } from "../app/Services/ComfyVideoService.js";
 import { ProductionController } from "../app/Controllers/ProductionController.js";
 
+test("studio rejects the compatibility workflow and preserves the submitted scene prompt", async t => {
+  const options = { baseUrl: "http://127.0.0.1:8188", workflowPath: "database/workflows/wan21-local-api.json" };
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  let submitted;
+  globalThis.fetch = async (_url, request) => {
+    submitted = JSON.parse(request.body).prompt;
+    return Response.json({ prompt_id: "job" });
+  };
+  const scene = { prompt: "Police approach a house in Colombo. A sign reads $&.", script_segment: "Obsolete scene description." };
+  await assert.rejects(() => new ComfyVideoService(options).submitScene(scene), /one-second compatibility test/);
+  assert.equal(submitted, undefined);
+  const preview = new ComfyVideoService({ ...options, allowTestWorkflow: true });
+  assert.equal(await preview.submitScene(scene, [{ name: "Hero", description: "White shirt", personality: "Old backstory" }]), "job");
+  const prompt = submitted["4"].inputs.text;
+  assert.ok(prompt.startsWith(scene.prompt));
+  assert.match(prompt, /White shirt/);
+  assert.doesNotMatch(prompt, /Obsolete scene description|Old backstory/);
+});
+
 test("local Wan reports missing weights before allowing generation", async () => {
   const originalFetch = globalThis.fetch;
   try {
