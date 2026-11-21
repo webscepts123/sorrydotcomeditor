@@ -3,7 +3,7 @@ import { copyFile, mkdir, open, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 
-export async function importKaggleVideo(database, { sceneId, source, publicRoot = path.resolve("public"), expectedJobId = null }) {
+export async function importKaggleVideo(database, { sceneId, source, publicRoot = path.resolve("public"), expectedJobId = null, uploaded = false }) {
   if (!Number.isSafeInteger(sceneId) || sceneId <= 0) throw new Error("Supply a positive scene ID with --scene.");
   if (!source || path.extname(source).toLowerCase() !== ".mp4") throw new Error("Select the downloaded Kaggle .mp4 file with --file.");
   const sourcePath = path.resolve(source);
@@ -16,7 +16,7 @@ export async function importKaggleVideo(database, { sceneId, source, publicRoot 
     if (header.toString("ascii", 4, 8) !== "ftyp") throw new Error("The selected file does not have an MP4 file header.");
   } finally { await handle.close(); }
 
-  const relative = `uploads/scenes/kaggle-${sceneId}-${randomUUID()}.mp4`;
+  const relative = `uploads/scenes/${uploaded ? "upload" : "kaggle"}-${sceneId}-${randomUUID()}.mp4`;
   const destination = path.join(publicRoot, relative);
   await mkdir(path.dirname(destination), { recursive: true });
   await copyFile(sourcePath, destination, constants.COPYFILE_EXCL);
@@ -25,8 +25,12 @@ export async function importKaggleVideo(database, { sceneId, source, publicRoot 
       const [rows] = await connection.execute("SELECT id, project_id, status, generation_job_id FROM scenes WHERE id = ? FOR UPDATE", [sceneId]);
       if (!rows.length) throw new Error(`Scene ${sceneId} does not exist.`);
       const active = ["Rendering", "Processing"].includes(rows[0].status);
-      if (expectedJobId ? !active || rows[0].generation_job_id !== expectedJobId : active) throw new Error("The scene no longer matches the expected running generation job. Refresh its status before importing.");
-      await connection.execute("UPDATE scenes SET video_path = ?, status = 'Ready', generation_job_id = NULL, generation_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [relative, sceneId]);
+      if (expectedJobId ? !active || rows[0].generation_job_id !== expectedJobId : active && !uploaded) throw new Error("The scene no longer matches the expected running generation job. Refresh its status before importing.");
+      if (active && uploaded) {
+        await connection.execute("UPDATE scenes SET video_path = ?, updated_at = updated_at WHERE id = ?", [relative, sceneId]);
+      } else {
+        await connection.execute("UPDATE scenes SET video_path = ?, status = 'Ready', generation_job_id = NULL, generation_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [relative, sceneId]);
+      }
       await connection.execute("UPDATE projects SET completed_clips = (SELECT COUNT(*) FROM scenes WHERE project_id = ? AND video_path IS NOT NULL AND video_path <> ''), updated_at = CURRENT_TIMESTAMP WHERE id = ?", [rows[0].project_id, rows[0].project_id]);
       return rows[0];
     });

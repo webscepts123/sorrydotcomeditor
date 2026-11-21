@@ -9,6 +9,7 @@ import { mediaUrl } from "../Views/studio-helpers.js";
 import { createNotebookTransfer, readNotebookTransfer } from "../Services/KaggleNotebookTransfer.js";
 import { ComfyRenderFailedError, ComfyTestWorkflowError } from "../Services/ComfyVideoService.js";
 import { RUNTIME_SETTINGS, listWorkflows, runtimeSettingsView, saveRuntimeSettings } from "../Services/RuntimeSettings.js";
+import { maxSceneUpload, uploadSceneVideo } from "../Services/SceneVideoUpload.js";
 
 const resourceDefinitions = {
   projects: {
@@ -698,6 +699,9 @@ export class ProductionController extends Controller {
         kaggleUsername,
         kaggleConnectionMessage,
         linkNotebookAction: `/scenes/${row.id}/link-kaggle-notebook`,
+        colabHref: `/scenes/${row.id}/colab-notebook`,
+        uploadClipAction: `/scenes/${row.id}/import-mp4`,
+        uploadLimit: maxSceneUpload,
         deleteAction: `/scenes/${row.id}/delete`
       });
     }
@@ -1188,6 +1192,35 @@ export class ProductionController extends Controller {
     this.context.response.setHeader("Cache-Control", "private, no-store");
     this.context.response.setHeader("Content-Disposition", `attachment; filename="scene-${document.sceneId}-1080p.ipynb"`);
     return this.text(document.body, 200, "application/x-ipynb+json; charset=utf-8");
+  }
+
+  async colabSceneNotebook() {
+    const job = await this.kaggleJob();
+    if (!job) return;
+    if (job.reference_image || job.reference_url) return this.abort(422, "This Colab workflow supports text-to-video. Use Kaggle or ComfyUI when a portrait reference is required.");
+    const notebook = JSON.parse(await readFile(new URL("../../notebooks/colab-video.ipynb", import.meta.url), "utf8"));
+    const payload = { scene_id: job.scene_id, prompt: job.prompt, opening_prompt: job.opening_prompt || "", negative_prompt: job.negative_prompt, seed: randomInt(2 ** 32) };
+    const encoded = Buffer.from(JSON.stringify(payload)).toString("hex");
+    notebook.cells.find(cell => cell.id === "scene-settings").source = [
+      "import json\n",
+      `SCENE = json.loads(bytes.fromhex("${encoded}").decode("utf-8"))\n`
+    ];
+    this.context.response.setHeader("Cache-Control", "private, no-store");
+    this.context.response.setHeader("Content-Disposition", `attachment; filename="scene-${job.scene_id}-colab.ipynb"`);
+    return this.text(JSON.stringify(notebook), 200, "application/x-ipynb+json; charset=utf-8");
+  }
+
+  async importSceneMp4() {
+    const scene = await this.findOwned("scenes", this.params.id);
+    try {
+      return this.json(await uploadSceneVideo(this.db, this.context.session.userId, scene, this.body));
+    } catch (error) {
+      if (error.code) {
+        console.error("Scene upload failed:", error.code);
+        return this.json({ message: "The studio could not save the video. Try again." }, 503);
+      }
+      return this.json({ message: error.message }, 422);
+    }
   }
 
   async openKaggleNotebook() {
@@ -1769,6 +1802,7 @@ export function registerProductionRoutes(app) {
   app.get("/scenes/:id/kaggle-job", ProductionController.handle("kaggleScene"));
   app.post("/scenes/:id/kaggle-prompt", ProductionController.handle("saveKagglePrompt"));
   app.get("/scenes/:id/kaggle-notebook", ProductionController.handle("kaggleSceneNotebook"));
+  app.get("/scenes/:id/colab-notebook", ProductionController.handle("colabSceneNotebook"));
   app.get("/scenes/:id/kaggle-open", ProductionController.handle("openKaggleNotebook"));
   app.get("/wan-kaggle/import/:token/notebook.ipynb", ProductionController.handle("kaggleNotebookImport"));
   app.get("/characters/export", ProductionController.handle("exportCharacters"));
@@ -1787,6 +1821,7 @@ export function registerProductionRoutes(app) {
   app.post("/scenes/:id/link-kaggle-notebook", ProductionController.handle("linkKaggleNotebook"));
   app.post("/scenes/:id/sync-render", ProductionController.handle("syncSceneRender"));
   app.post("/scenes/:id/attach-video", ProductionController.handle("attachVideo"));
+  app.post("/scenes/:id/import-mp4", ProductionController.handle("importSceneMp4"));
   app.post("/posters/generate-ideas", ProductionController.handle("generatePosterIdeas"));
   app.post("/posters/generate", ProductionController.handle("generatePoster"));
   app.post("/projects/:id/assign-editor", ProductionController.handle("assignEditor"));

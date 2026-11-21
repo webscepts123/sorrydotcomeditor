@@ -8,6 +8,7 @@ html lang="en"
     script src="/public/project-show.js?v=2" defer="defer"
     link rel="stylesheet" href="/public/scene-progress.css?v=6"
     script src="/public/scene-progress.js?v=8" defer="defer"
+    script src="/public/scene-video-upload.js" defer="defer"
   body
     div.app-shell
       nav.side-nav
@@ -134,6 +135,18 @@ html lang="en"
                       button.secondary type="submit" "Check render status"
               form method="post" action="{{deleteAction}}"
                 button.danger type="submit" "Delete sequence"
+          article.record-card
+            h2 "Render with Colab GPU"
+            p.muted "Download this scene's text-to-video notebook, open it in Colab, select a GPU runtime, and run all cells. Upload the exported MP4 here."
+            div.action-row
+              a.nav-link href="{{colabHref}}" "Download Colab notebook"
+              a.nav-link href="https://colab.research.google.com/" target="_blank" rel="noopener noreferrer" "Open Google Colab"
+            form.form-card method="post" action="{{uploadClipAction}}" data-scene-upload="true" data-upload-limit="{{uploadLimit}}"
+              input type="hidden" name="_csrf" value="{{csrfToken}}"
+              label for="scene-video-file" "Scene MP4 (up to 64 MB)"
+              input#scene-video-file type="file" name="clip" accept=".mp4,video/mp4" required="required"
+              button.primary type="submit" "Upload MP4"
+              p.muted data-upload-status="true" role="status" ""
           if kaggleUsername
             p.muted "Kaggle connected as {{kaggleUsername}}"
           else

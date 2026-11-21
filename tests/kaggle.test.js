@@ -7,6 +7,7 @@ import { importKaggleVideo } from "../app/Services/KaggleVideoImport.js";
 import { ProductionController } from "../app/Controllers/ProductionController.js";
 import { kaggleControls } from "../app/Views/studio-helpers.js";
 import { createNotebookTransfer, readNotebookTransfer } from "../app/Services/KaggleNotebookTransfer.js";
+import { uploadSceneVideo } from "../app/Services/SceneVideoUpload.js";
 
 test("private Kaggle import snapshots expire and reject guessed or traversal paths", async t => {
   const root = await mkdtemp(path.join(tmpdir(), "kaggle-transfer-"));
@@ -51,6 +52,52 @@ test("scene notebook includes the saved prompt safely and selects 1080p", async 
   assert.match(html, /\/scenes\/9\/kaggle-notebook/);
   controller.findOwned = async () => { throw new Error("404 Scene not found"); };
   await assert.rejects(() => controller.kaggleSceneNotebook(), /404/);
+});
+
+test("Colab notebook exports the owned scene prompt without Kaggle credentials", async () => {
+  const controller = new ProductionController({
+    params: { id: "6" }, response: { setHeader() {} }, text: body => body,
+    service: () => ({ query: async () => [] })
+  });
+  controller.findOwned = async table => table === "scenes"
+    ? { id: 6, project_id: 1, prompt: "Colombo skyline with the Lotus Tower." }
+    : { id: 1 };
+  const notebook = JSON.parse(await controller.colabSceneNotebook());
+  const settings = notebook.cells.find(cell => cell.id === "scene-settings").source.join("");
+  const encoded = settings.match(/bytes.fromhex\("([a-f0-9]+)"\)/)[1];
+  const job = JSON.parse(Buffer.from(encoded, "hex").toString());
+  assert.equal(job.scene_id, 6);
+  assert.match(job.prompt, /Colombo skyline/);
+  assert.doesNotMatch(JSON.stringify(notebook), /KAGGLE_API_TOKEN/);
+});
+
+test("browser MP4 uploads assemble chunks once and preserve an active GPU job", async t => {
+  const root = await mkdtemp(path.join(tmpdir(), "scene-upload-test-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const options = { root: path.join(root, "uploads"), publicRoot: path.join(root, "public") };
+  const original = Buffer.concat([Buffer.from("000000186674797069736f6d", "hex"), Buffer.alloc(8192, 42)]);
+  let videoPath;
+  let attachments = 0;
+  const db = { transaction: work => work({ execute: async (sql, values) => {
+    if (sql.startsWith("SELECT")) return [[{ id: 6, project_id: 2, status: "Rendering", generation_job_id: "kaggle:owner/scene" }]];
+    if (sql.startsWith("UPDATE scenes")) {
+      assert.match(sql, /updated_at = updated_at/);
+      assert.doesNotMatch(sql, /generation_job_id/);
+      videoPath = values[0];
+      attachments++;
+    }
+  } }) };
+  const id = "11111111-1111-4111-8111-111111111111";
+  const base = { id, size: original.length };
+  const first = { ...base, offset: 0, data: original.subarray(0, 512).toString("base64") };
+  const last = { ...base, offset: 512, data: original.subarray(512).toString("base64") };
+  assert.deepEqual(await uploadSceneVideo(db, 3, { id: 6 }, first, options), { received: 512 });
+  assert.deepEqual(await uploadSceneVideo(db, 3, { id: 6 }, first, options), { received: 512 });
+  const result = await uploadSceneVideo(db, 3, { id: 6 }, last, options);
+  assert.deepEqual(result, { received: original.length, ready: true });
+  assert.deepEqual(await uploadSceneVideo(db, 3, { id: 6 }, last, options), result);
+  assert.deepEqual(await readFile(path.join(options.publicRoot, videoPath)), original);
+  assert.equal(attachments, 1);
 });
 
 test("Kaggle notebook sends the opening and main shot separately with the assigned portrait", async t => {
