@@ -39,7 +39,10 @@ output += "                <div class=\"nle-menu-dropdown\">\n";
 output += "                    <a class=\"nle-menu-link\" href=\"" + escapeHtml(`/projects/${project.id}`) + "\"><span>Project Overview</span><small>Esc</small></a>\n";
 output += "                    <a class=\"nle-menu-link\" href=\"" + escapeHtml(`/projects/${project.id}/export-xml`) + "\"><span>Export Scene XML</span><small>XML</small></a>\n";
 if (currentScene) {
-output += "                        <a class=\"nle-menu-link\" href=\"" + escapeHtml(mediaUrl(currentScene?.video_path)) + "\"><span>Download Scene MP4</span><small>MP4</small></a>\n";
+const sceneDownloadUrl = mediaUrl(currentScene?.video_path);
+if (sceneDownloadUrl) {
+  output += "                        <a class=\"nle-menu-link\" href=\"" + escapeHtml(sceneDownloadUrl) + "\" download><span>Download Scene MP4</span><small>MP4</small></a>\n";
+}
 }
 output += "                    <button type=\"button\" class=\"nle-menu-link\" data-studio-click=\"0\"><span>Capture 4K PNG Still</span><small>Snap</small></button>\n";
 output += "                    <button type=\"button\" class=\"nle-menu-link\" data-studio-click=\"1\"><span>Batch Render All</span><small>Batch</small></button>\n";

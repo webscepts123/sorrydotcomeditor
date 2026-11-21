@@ -99,7 +99,10 @@ html lang="en"
               button.primary type="submit" "Batch render scenes"
             form method="post" action="{{posterAction}}"
               button.secondary type="submit" "Generate poster"
-            a.nav-link href="{{downloadHref}}" "Download completed movie"
+            if downloadHref
+              a.nav-link href="{{downloadHref}}" download="download" "Download completed movie"
+            else
+              p.muted "Completed movie unavailable. Download rendered scene clips from the video editor."
             form method="post" action="{{deleteAction}}"
               button.danger type="submit" "Delete production"
           if hasEditors

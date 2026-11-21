@@ -1,6 +1,6 @@
 import { Controller } from "noderyx-framework";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, statfs, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, statfs, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { repositories } from "../Models/index.js";
 import { renderStudio } from "../Views/Studio.js";
@@ -159,6 +159,18 @@ function routeId(value) {
 function redirect(context, location) {
   context.response.setHeader("Location", location);
   return context.text("", 303);
+}
+
+async function completedMovieUrl(project) {
+  const url = mediaUrl(project.final_movie_path);
+  if (!url) return "";
+  try {
+    const file = await stat(path.resolve(process.cwd(), url.slice(1)));
+    return file.isFile() && file.size > 0 ? url : "";
+  } catch (error) {
+    if (["ENOENT", "ENOTDIR"].includes(error.code)) return "";
+    throw error;
+  }
 }
 
 function flash(context, message) {
@@ -565,7 +577,7 @@ export class ProductionController extends Controller {
         videoEditorHref: `/projects/${row.id}/videoeditor`,
         editorHref: `/projects/${row.id}/editor`,
         xmlHref: `/projects/${row.id}/export-xml`,
-        downloadHref: `/projects/${row.id}/download-video/1080p`,
+        downloadHref: await completedMovieUrl(row) ? `/projects/${row.id}/download-video/1080p` : "",
         sceneCreateHref: `/scenes/create?project_id=${row.id}`,
         editorAssignAction: `/projects/${row.id}/assign-editor`,
         editors: editors.map((editor) => ({ value: String(editor.id), label: editor.name })),
@@ -1360,12 +1372,12 @@ export class ProductionController extends Controller {
 
   async downloadVideo() {
     const project = await this.findOwned("projects", this.params.id);
-    const source = String(project.final_movie_path ?? "");
-    if (!/^uploads\/[a-zA-Z0-9._/-]+$/.test(source) || source.split("/").includes("..")) {
-      return this.abort(404, "No rendered movie is available.");
+    const url = await completedMovieUrl(project);
+    if (!url) {
+      flash(this.context, "The completed movie is unavailable. Open the video editor to download any rendered scene clips.");
+      return redirect(this.context, `/projects/${project.id}`);
     }
-    this.context.response.setHeader("Location", `/public/${source}`);
-    return this.text("", 303);
+    return redirect(this.context, url);
   }
 
   async parseScript() {

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import vm from "node:vm";
@@ -35,6 +35,33 @@ test("production routes include the application workflows", () => {
   assert.ok([...paths].some((route) => route.startsWith("GET ") && route.includes("/projects")));
   assert.ok([...paths].some((route) => route.startsWith("POST ") && route.includes("/scenes")));
   assert.ok([...paths].some((route) => route.startsWith("POST ") && route.includes("posters") && route.includes("generate")));
+});
+
+test("completed movie downloads resolve saved files and recover from missing renders", async (t) => {
+  const directory = await mkdtemp(path.resolve("public", "movie-download-test-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const source = `${path.basename(directory)}/movie.mp4`;
+  await writeFile(path.join(directory, "movie.mp4"), "test movie");
+  const headers = {};
+  const session = {};
+  const controller = new ProductionController({
+    params: { id: "1" },
+    session,
+    response: { setHeader: (name, value) => { headers[name] = value; } },
+    text: (value, status) => ({ value, status })
+  });
+  const project = { id: 1, final_movie_path: `/public/${source}` };
+  controller.findOwned = async () => project;
+
+  assert.equal((await controller.downloadVideo()).status, 303);
+  assert.equal(headers.Location, `/public/${source}`);
+
+  for (const missing of [null, `${source}.missing`, "uploads/../movie.mp4"]) {
+    project.final_movie_path = missing;
+    assert.equal((await controller.downloadVideo()).status, 303);
+    assert.equal(headers.Location, "/projects/1");
+    assert.match(session.flash, /download any rendered scene clips/);
+  }
 });
 
 test("unauthenticated requests are redirected except public entry points", async () => {
