@@ -354,12 +354,19 @@ test("original studio renders selected owned media and supports original scene l
     assert.equal(id, "12");
     return { id: 12, title: "Test production" };
   };
+  Object.defineProperty(controller, "comfyConfigured", { value: false, configurable: true });
   await controller.projectVideoEditor();
   assert.match(rendered, /id="mainPlayer" src="\/public\/uploads\/scenes\/clip.mp4"/);
   assert.match(rendered, /name="_csrf" value="test-csrf"/);
   assert.match(rendered, /action="\/scenes\/5\/kaggle-prompt"/);
   assert.equal((rendered.match(/<textarea[^>]+name="prompt"/g) ?? []).length, 1);
   assert.doesNotMatch(rendered, /Wan 2\.1|\/render-local|name="script_segment"/);
+  assert.doesNotMatch(rendered, /action="\/scenes\/5\/render"/);
+  assert.match(rendered, /href="\/settings#comfyui"/);
+  Object.defineProperty(controller, "comfyConfigured", { value: true });
+  context.query.inspector = "ai";
+  await controller.projectVideoEditor();
+  assert.match(rendered, /id="insp-ai" class="insp-content active"/);
   assert.match(rendered, /action="\/scenes\/5\/render"/);
   assert.match(rendered, /action="\/projects\/12\/render-batch"/);
   for (const workspace of ["edit", "color", "fairlight", "deliver"]) {
@@ -375,6 +382,24 @@ test("original studio renders selected owned media and supports original scene l
   assert.match(rendered, /action="\/scenes\/4\/kaggle-prompt"/);
   context.query.scene_id = "99";
   await assert.rejects(() => controller.projectVideoEditor(), /404 Scene not found/);
+});
+
+test("unconfigured ComfyUI returns to the scene or project without changing render state", async () => {
+  const session = {};
+  const headers = {};
+  const controller = new ProductionController({
+    request: { headers: { accept: "text/html" } }, params: { id: "5" }, session,
+    response: { setHeader: (name, value) => { headers[name] = value; } },
+    text: (_body, status) => ({ status }),
+    service: () => { throw new Error("No worker or database call expected"); }
+  });
+  Object.defineProperty(controller, "comfyConfigured", { value: false });
+  controller.findOwned = async () => ({ id: 5, status: "Draft" });
+  assert.equal((await controller.renderScene()).status, 303);
+  assert.equal(headers.Location, "/scenes/5");
+  assert.match(session.flash, /generate on Kaggle/);
+  assert.equal((await controller.renderBatch()).status, 303);
+  assert.equal(headers.Location, "/projects/5");
 });
 
 test("video editor creates a playable video and operates preview controls", async () => {

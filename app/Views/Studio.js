@@ -1,6 +1,6 @@
 // Original VOID SHADOW videoeditor interface, ported from the Blade view.
 import { escapeHtml, mediaUrl, aiEngineControls } from "./studio-helpers.js";
-export function renderStudio({ project, scenes, characters = [], currentScene = null, csrfToken = "" }) {
+export function renderStudio({ project, scenes, characters = [], currentScene = null, csrfToken = "", comfyConfigured = false, showAiInspector = false }) {
 const currentSceneId = currentScene?.id;
 const currentSceneIndex = Math.max(0, scenes.findIndex(s => s.id === currentSceneId));
 const clipWidth = 180, playheadLeft = currentSceneIndex * 182;
@@ -45,7 +45,7 @@ if (sceneDownloadUrl) {
 }
 }
 output += "                    <button type=\"button\" class=\"nle-menu-link\" data-studio-click=\"0\"><span>Capture 4K PNG Still</span><small>Snap</small></button>\n";
-output += "                    <button type=\"button\" class=\"nle-menu-link\" data-studio-click=\"1\"><span>Batch Render All</span><small>Batch</small></button>\n";
+if (comfyConfigured) output += "                    <button type=\"button\" class=\"nle-menu-link\" data-studio-click=\"1\"><span>Batch Render All</span><small>Batch</small></button>\n";
 output += "                    <div class=\"nle-menu-separator\"></div>\n";
 output += "                    <a class=\"nle-menu-link text-danger\" href=\"" + escapeHtml(`/projects/${project.id}`) + "\"><span>Exit Studio</span><small>Exit</small></a>\n";
 output += "                </div>\n";
@@ -124,18 +124,18 @@ output += "                </div>\n";
 output += "            </div>\n";
 output += "            \n";
 output += "            <div class=\"inspector-tabs\">\n";
-output += "                <div class=\"insp-tab active\" data-studio-click=\"22\">Transform</div>\n";
+output += "                <div class=\"insp-tab" + (showAiInspector && currentScene ? "" : " active") + "\" data-studio-click=\"22\">Transform</div>\n";
 output += "                <div class=\"insp-tab\" data-studio-click=\"23\"><i class=\"bi bi-stars me-1\"></i>VFX</div>\n";
 output += "                <div class=\"insp-tab\" data-studio-click=\"24\"><i class=\"bi bi-type me-1\"></i>Titles</div>\n";
 output += "                <div class=\"insp-tab\" data-studio-click=\"25\"><i class=\"bi bi-intersect me-1\"></i>Transitions</div>\n";
-output += "                <div class=\"insp-tab\" data-studio-click=\"26\"><i class=\"bi bi-cpu-fill me-1\"></i>AI Engine</div>\n";
+output += "                <div class=\"insp-tab" + (showAiInspector && currentScene ? " active" : "") + "\" data-studio-click=\"26\"><i class=\"bi bi-cpu-fill me-1\"></i>AI Engine</div>\n";
 output += "            </div>\n";
 output += "\n";
 output += "            <div class=\"nle-panel-content custom-scrollbar\">\n";
 if (currentScene) {
 output += "                    \n";
 output += "                    <!-- Tab 1: Video Transform & Motion -->\n";
-output += "                    <div id=\"insp-video\" class=\"insp-content active\">\n";
+output += "                    <div id=\"insp-video\" class=\"insp-content" + (showAiInspector ? "" : " active") + "\">\n";
 output += "                        <div class=\"mb-3 p-2 border border-secondary bg-black\">\n";
 output += "                            <div class=\"text-white fw-bold font-mono mb-1\" style=\"font-size: 11px;\">SEQ #" + escapeHtml(String(currentScene.order_index).padStart(3, '0')) + "</div>\n";
 output += "                            <div class=\"text-secondary text-truncate\" title=\"" + escapeHtml(sceneFileName(currentScene)) + "\" style=\"font-size: 10px;\">\n";
@@ -810,8 +810,8 @@ output += "                        </div>\n";
 output += "                    </div>\n";
 output += "\n";
 output += "                    <!-- Tab 5: AI Engine & Studio Seeds -->\n";
-output += "                    <div id=\"insp-ai\" class=\"insp-content\">\n";
-output += aiEngineControls(currentScene, csrfToken);
+output += "                    <div id=\"insp-ai\" class=\"insp-content" + (showAiInspector ? " active" : "") + "\">\n";
+output += aiEngineControls(currentScene, csrfToken, comfyConfigured);
 output += "                    </div>\n";
 output += "\n";
 } else {
@@ -1011,10 +1011,12 @@ output += "                                    " + escapeHtml(String(job.status 
 output += "                                </span>\n";
 output += "                            </div>\n";
 output += "                            <div class=\"d-flex gap-1 mt-1\">\n";
+if (comfyConfigured) {
 output += "                                <form action=\"" + escapeHtml(`/scenes/${job.id}/render`) + "\" method=\"POST\" class=\"flex-grow-1 m-0\">\n";
 output += "                                    <input type=\"hidden\" name=\"_csrf\" value=\"" + escapeHtml(csrfToken) + "\">\n";
 output += "                                    <button type=\"submit\" class=\"btn btn-sm btn-dark border-secondary text-info w-100 p-0\" style=\"font-size:8px;\">Render</button>\n";
 output += "                                </form>\n";
+}
 output += "                                <a href=\"" + escapeHtml(`/projects/${project.id}/videoeditor`) + "?active_scene=" + escapeHtml(job.id) + "\" class=\"btn btn-sm btn-dark border-secondary text-white p-0 px-2\" style=\"font-size:8px;\">Open</a>\n";
 output += "                            </div>\n";
 output += "                        </div>\n";
@@ -1432,9 +1434,11 @@ output += "                        <div class=\"mt-4 pt-3 border-top border-seco
 output += "                            <a href=\"" + escapeHtml(`/projects/${project.id}/export-xml`) + "\" class=\"btn btn-outline-info rounded-0 px-4 font-mono small\">\n";
 output += "                                <i class=\"bi bi-file-earmark-code me-1\"></i> EXPORT SCENE XML\n";
 output += "                            </a>\n";
+if (comfyConfigured) {
 output += "                            <button type=\"button\" class=\"btn btn-white bg-white text-black fw-bold rounded-0 px-4 font-mono small\" data-studio-click=\"146\">\n";
 output += "                                <i class=\"bi bi-cpu me-1\"></i> BATCH RENDER ALL SCENES\n";
 output += "                            </button>\n";
+}
 output += "                        </div>\n";
 output += "                    </div>\n";
 output += "                </div>\n";

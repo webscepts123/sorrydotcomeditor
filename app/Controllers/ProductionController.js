@@ -233,6 +233,7 @@ export class ProductionController extends Controller {
   get db() { return this.service("db"); }
   get models() { return repositories(this.db); }
   get comfy() { return this.service("comfy")(); }
+  get comfyConfigured() { return Boolean(process.env.COMFYUI_URL?.trim()); }
   get wantsHtml() {
     const accept = this.context.request.headers?.accept ?? "";
     return accept.includes("text/html") && !accept.includes("application/json");
@@ -615,9 +616,10 @@ export class ProductionController extends Controller {
         hasCharacters: characterRows.length > 0,
         editHref: `/scenes/${row.id}/edit`,
         renderAction: `/scenes/${row.id}/render`,
+        comfyConfigured: this.comfyConfigured,
         renderBusy: ["Rendering", "Processing"].includes(row.status),
         kaggleRender: String(row.generation_job_id ?? "").startsWith("kaggle:"),
-        videoEditorHref: `/projects/${row.project_id}/videoeditor?scene_id=${row.id}`,
+        videoEditorHref: `/projects/${row.project_id}/videoeditor?scene_id=${row.id}&inspector=ai`,
         syncAction: `/scenes/${row.id}/sync-render`,
         progressUrl: `/scenes/${row.id}/progress`,
         cancelRenderAction: `/scenes/${row.id}/cancel-render`,
@@ -799,7 +801,7 @@ export class ProductionController extends Controller {
     const scenes = await this.db.query("SELECT * FROM scenes WHERE project_id = ? ORDER BY order_index, id", [project.id]);
     if (view === "editor") {
       const characters = await this.db.query("SELECT * FROM characters WHERE project_id = ? ORDER BY id", [project.id]);
-      return this.studioResponse(renderProductionEditor({ project, scenes, characters, csrfToken: this.context.csrfToken }));
+      return this.studioResponse(renderProductionEditor({ project, scenes, characters, csrfToken: this.context.csrfToken, comfyConfigured: this.comfyConfigured }));
     }
     return this.render("timeline", {
       title: `${project.title} — ${view}`,
@@ -846,7 +848,10 @@ export class ProductionController extends Controller {
       ? scenes.find((candidate) => Number(candidate.id) === requestedSceneId)
       : scenes.find((candidate) => candidate.video_path) ?? scenes[0];
     if (requestedSceneId && !scene) return this.abort(404, "Scene not found in this production.");
-    return this.studioResponse(renderStudio({ project, scenes, currentScene: scene, csrfToken: this.context.csrfToken }));
+    return this.studioResponse(renderStudio({
+      project, scenes, currentScene: scene, csrfToken: this.context.csrfToken,
+      comfyConfigured: this.comfyConfigured, showAiInspector: this.query.inspector === "ai"
+    }));
   }
 
   studioResponse(html) {
@@ -1140,6 +1145,13 @@ export class ProductionController extends Controller {
     return this.renderScene("local");
   }
 
+  unavailableComfyRender(location) {
+    const message = "ComfyUI has no connected worker. Open AI Engine to generate on Kaggle, or connect a ComfyUI worker in Settings.";
+    if (!this.wantsHtml) return this.json({ message }, 503);
+    flash(this.context, message);
+    return redirect(this.context, location);
+  }
+
   async renderScene(provider = "configured") {
     const scene = await this.findOwned("scenes", this.params.id);
     if (["Rendering", "Processing"].includes(scene.status)) {
@@ -1148,11 +1160,12 @@ export class ProductionController extends Controller {
       flash(this.context, message);
       return redirect(this.context, `/scenes/${scene.id}`);
     }
+    const local = provider === "local";
+    if (!local && !this.comfyConfigured) return this.unavailableComfyRender(`/scenes/${scene.id}`);
     const characters = await this.db.query(
       "SELECT c.* FROM characters c INNER JOIN character_scene cs ON cs.character_id = c.id WHERE cs.scene_id = ?",
       [scene.id]
     );
-    const local = provider === "local";
     let jobId;
     try {
       const service = local ? this.service("comfyLocal")() : this.comfy;
@@ -1245,6 +1258,7 @@ export class ProductionController extends Controller {
 
   async renderBatch() {
     const project = await this.findOwned("projects", this.params.id);
+    if (!this.comfyConfigured) return this.unavailableComfyRender(`/projects/${project.id}`);
     const scenes = await this.db.query("SELECT * FROM scenes WHERE project_id = ? AND status NOT IN ('Rendering', 'Processing') ORDER BY order_index, id", [project.id]);
     let queued = 0;
     for (const scene of scenes) {

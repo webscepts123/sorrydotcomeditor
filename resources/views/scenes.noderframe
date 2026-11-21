@@ -107,14 +107,17 @@ html lang="en"
               a.primary-link href="{{editHref}}" "Edit sequence"
               if renderBusy
                 p.muted "A generation job is already running."
-              else
+              else if comfyConfigured
                 form method="post" action="{{renderAction}}"
                   button.primary type="submit" "Queue ComfyUI render"
               if kaggleRender
                 a.nav-link href="{{videoEditorHref}}" "Check Kaggle progress in video editor"
-              else if scene.generation_job_id
-                form method="post" action="{{syncAction}}"
-                  button.secondary type="submit" "Check render status"
+              else
+                a.nav-link href="{{videoEditorHref}}" "Open AI Engine"
+                if comfyConfigured
+                  if scene.generation_job_id
+                    form method="post" action="{{syncAction}}"
+                      button.secondary type="submit" "Check render status"
               form method="post" action="{{deleteAction}}"
                 button.danger type="submit" "Delete sequence"
           form.form-card method="post" action="{{linkNotebookAction}}"

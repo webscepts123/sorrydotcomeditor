@@ -62,9 +62,9 @@ html lang="en"
           div.detail-row
             strong "Kaggle Python runtime"
             p "{{kagglePython}}"
-        article.record-card.settings-card
+        article#comfyui.record-card.settings-card
           h2 "ComfyUI render server"
-          p.muted "Used by the Queue ComfyUI render button on scenes. Changes apply to new renders immediately — no restart needed."
+          p.muted "Required for ComfyUI renders only. Enter the URL of a running worker reachable from the live studio. Kaggle generation uses your Kaggle account."
           form.settings-form method="post" action="/settings"
             for setting in comfySettings
               label for="{{setting.name}}" "{{setting.label}}"
