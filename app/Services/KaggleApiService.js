@@ -8,7 +8,7 @@ import { importKaggleVideo } from "./KaggleVideoImport.js";
 
 const bridge = fileURLToPath(new URL("../../scripts/kaggle-api.py", import.meta.url));
 const validKernel = /^[a-zA-Z0-9_-]{1,64}\/[a-zA-Z0-9_-]{1,150}$/;
-const progressStages = ["model_loaded", "loading_opening", "opening", "loading_main", "main", "exporting"];
+const progressStages = ["model_loaded", "sampling", "loading_opening", "opening", "loading_main", "main", "exporting"];
 
 export function runKaggle(payload, timeout = 90000, onProgress) {
   const hosted = "/home/studiosorrydotco/apps/sorrydotcomeditor/shared/kaggle-venv/bin/python";

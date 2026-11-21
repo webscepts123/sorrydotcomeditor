@@ -4,6 +4,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import sys
 import tempfile
 
@@ -13,6 +14,9 @@ class BridgeError(RuntimeError):
 
 
 def stream_progress(api, kernel):
+    sampling = False
+    structured = False
+    legacy_stage = "sampling"
     for event in api.kernels_logs_stream(kernel):
         data = event.get("data", "") if isinstance(event, dict) else ""
         if not isinstance(data, str):
@@ -24,8 +28,23 @@ def stream_progress(api, kernel):
                     progress = json.loads(line.removeprefix("STUDIO_PROGRESS "))
                 except ValueError:
                     continue
+                structured = True
+            elif structured:
+                continue
             elif line.startswith("Loaded ") and "CogVideoX" in line:
+                sampling = True
+                legacy_stage = "main" if "I2V" in line else "sampling"
                 progress = {"stage": "model_loaded", "step": 0, "total": 0}
+            elif line.startswith("Generated ") and " frames" in line:
+                sampling = False
+                continue
+            elif sampling:
+                # Older notebooks can report real steps in the tqdm sampler bar.
+                match = re.match(r"^\d{1,3}%\|[^|]*\|\s*(\d+)\s*/\s*(\d+)\s*\[", line)
+                if not match:
+                    continue
+                step, total = map(int, match.groups())
+                progress = {"stage": legacy_stage, "step": step, "total": total}
             else:
                 continue
             print(json.dumps({"progress": progress}), file=sys.__stdout__, flush=True)

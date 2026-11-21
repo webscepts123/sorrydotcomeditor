@@ -63,6 +63,7 @@
   const stageLabels = { queued: "Queued", running: "Generating", downloading: "Importing", ready: "Ready" };
   const detailLabels = {
     model_loaded: "Model loaded · generating frames",
+    sampling: "Sampling",
     loading_opening: "Loading the opening-shot model",
     opening: "Opening shot",
     loading_main: "Loading the main-shot model",
@@ -73,8 +74,13 @@
     if (!state) return;
     const stage = state.failed ? null : stageOf(state);
     const current = order.indexOf(stage);
-    percentLabel.textContent = state.failed ? "Failed" : stageLabels[stage] || "Checking";
-    track.setAttribute("aria-valuetext", percentLabel.textContent);
+    const detail = state.progress_detail;
+    const showPercent = !state.failed && state.busy && detail?.total > 0 && stage !== "downloading" && stage !== "ready";
+    const percent = showPercent ? Math.floor(100 * detail.step / detail.total) : null;
+    percentLabel.textContent = percent === null
+      ? state.failed ? "Failed" : stageLabels[stage] || "Checking"
+      : `${percent}% sampled`;
+    track.setAttribute("aria-valuetext", stageLabels[stage] || percentLabel.textContent);
     fill.style.width = current < 0 ? "0" : ((current + 1) * 25) + "%";
     elapsedLabel.textContent = "Elapsed " + format(elapsed());
     etaLabel.textContent = state.stalled && !state.failed ? "Taking longer than usual" : "";
@@ -98,7 +104,9 @@
     const progressLabel = detailLabels[progress?.stage];
     detail.hidden = !progressLabel || data.failed || stage === "downloading" || stage === "ready";
     if (!detail.hidden) {
-      detailLabel.textContent = progress.total ? `${progressLabel} · step ${progress.step} of ${progress.total}` : progressLabel;
+      detailLabel.textContent = progress.total
+        ? `${progressLabel} · ${progress.step} / ${progress.total} steps`
+        : progress.stage === "model_loaded" ? `${progressLabel} · waiting for step count` : progressLabel;
       detailTrack.hidden = !progress.total;
       if (progress.total) {
         detailTrack.setAttribute("aria-valuemax", String(progress.total));
