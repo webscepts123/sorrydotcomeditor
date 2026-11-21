@@ -1,0 +1,60 @@
+name: Connect private ComfyUI worker
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/connect-comfy-worker.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  connect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Authorize loopback-only worker tunnel
+        env:
+          CPANEL_KEY: ${{ secrets.CPANEL_KEY }}
+          CPANEL_KNOWN_HOSTS: ${{ secrets.CPANEL_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$CPANEL_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$CPANEL_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          candidate='studio.sorrydotcom.lk ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINKb7ek7Bsi55hu69raJG4Sgoo4fK3wq3vPFQEnSe8W8'
+          printf '%s\n' "$candidate" > "$RUNNER_TEMP/comfy-host"
+          expected="$(ssh-keygen -lf "$RUNNER_TEMP/comfy-host" | awk '{print $2}')"
+          ssh-keygen -F studio.sorrydotcom.lk -f ~/.ssh/known_hosts > "$RUNNER_TEMP/pinned"
+          ssh-keygen -lf "$RUNNER_TEMP/pinned" | awk '{print $2}' | grep -Fxq "$expected"
+          echo "Worker SSH host pin verified."
+          remote=studiosorrydotco@studio.sorrydotcom.lk
+          ssh_args=(-i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes)
+          ssh "${ssh_args[@]}" "$remote" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          touch "$HOME/.ssh/authorized_keys"
+          key='restrict,port-forwarding,permitopen="127.0.0.1:1",permitlisten="127.0.0.1:8188",command="/bin/false" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOrhn3IhmEej+O9rSS2JwSsO+WPGzBfPRqAl9D77sXcR studio-comfy-worker'
+          if ! grep -Fqx -- "$key" "$HOME/.ssh/authorized_keys"; then
+            printf '\n%s\n' "$key" >> "$HOME/.ssh/authorized_keys"
+          fi
+          REMOTE
+          echo "Worker tunnel key authorized."
+      - name: Verify ComfyUI from the live server
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes studiosorrydotco@studio.sorrydotcom.lk 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          for attempt in $(seq 1 36); do
+            if curl -fsS --max-time 3 http://127.0.0.1:8188/system_stats 2>/dev/null | grep -q '"comfyui_version"'; then
+              curl -fsS --max-time 5 http://127.0.0.1:8188/queue
+              echo
+              echo "ComfyUI is reachable from the live hosting account."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'The Windows worker tunnel did not become reachable.'
+          exit 1
+          REMOTE
+
