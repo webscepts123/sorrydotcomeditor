@@ -61,6 +61,22 @@ test("Kaggle submission reserves the scene and runs a private notebook without i
   assert.deepEqual(await readdir(path.join(service.root, "jobs")), []);
 });
 
+test("Kaggle settings recognize legacy keys and kaggle.json without exposing mismatched credentials", async t => {
+  const checked = [];
+  const service = await fixture(t, async ({ credentials }) => {
+    checked.push(credentials);
+    return { connected: true };
+  });
+  const key = "b".repeat(32);
+  await service.connect(2, { username: "Filmmaker", secret: key });
+  await service.connect(2, { secret: JSON.stringify({ username: "filmmaker", key }) });
+  await assert.rejects(() => service.connect(2, { username: "someone-else", secret: JSON.stringify({ username: "filmmaker", key }) }), /username differs/);
+  assert.deepEqual(checked, [
+    { username: "filmmaker", secret: key, kind: "legacy" },
+    { username: "filmmaker", secret: key, kind: "legacy" }
+  ]);
+});
+
 test("a saved notebook can replace a stale render on the same scene", async t => {
   let state = "draft";
   const writes = [];

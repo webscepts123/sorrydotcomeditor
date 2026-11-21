@@ -1583,7 +1583,7 @@ export class ProductionController extends Controller {
     const sceneId = routeId(this.body?.scene_id);
     const scene = sceneId ? await this.findOwned("scenes", sceneId) : null;
     try {
-      const result = await this.service("kaggle").connect(this.context.session.userId, { username: this.body?.username, secret: this.body?.secret, kind: this.body?.kind === "legacy" ? "legacy" : "token" });
+      const result = await this.service("kaggle").connect(this.context.session.userId, { username: this.body?.username, secret: this.body?.secret, kind: this.body?.kind });
       flash(this.context, `Kaggle connected as ${result.username}.`);
     } catch (error) {
       flash(this.context, `Kaggle not connected. ${error.message}`);

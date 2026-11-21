@@ -58,8 +58,19 @@ export class KaggleApiService {
       throw new Error("Reconnect Kaggle: the saved connection could not be read.");
     }
   }
-  async connect(userId, { username, secret, kind = "token" }) {
+  async connect(userId, { username, secret, kind = "auto" }) {
     username = String(username || "").trim().toLowerCase(); secret = String(secret || "").trim();
+    if (secret.length <= 4096 && secret.startsWith("{")) {
+      let legacy;
+      try { legacy = JSON.parse(secret); }
+      catch { throw new Error("The pasted kaggle.json is invalid. Copy the complete file or paste the key value."); }
+      const legacyUsername = typeof legacy?.username === "string" ? legacy.username.trim().toLowerCase() : "";
+      if (username && legacyUsername && username !== legacyUsername) throw new Error("The Kaggle username differs from the one in kaggle.json.");
+      username = username || legacyUsername;
+      secret = typeof legacy?.key === "string" ? legacy.key.trim() : "";
+      kind = "legacy";
+    }
+    if (kind === "auto") kind = /^[a-f0-9]{32}$/i.test(secret) ? "legacy" : "token";
     if (!/^[a-z0-9_-]{3,64}$/.test(username) || !secret || secret.length > 4096 || !["token", "legacy"].includes(kind)) throw new Error("Enter your Kaggle username and API token.");
     const credentials = { username, secret, kind };
     this.key();

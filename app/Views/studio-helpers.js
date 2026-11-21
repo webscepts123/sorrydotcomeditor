@@ -110,11 +110,12 @@ function kaggleConnectionControls(csrfToken, summary) {
   return `<details class="ai-engine-options" data-kaggle-connect-panel>
     <summary>${summary}</summary>
     <p class="small" role="status" data-kaggle-connection>Checking Kaggle connection…</p>
+    <a class="nle-btn" href="/settings#kaggle">Manage Kaggle in Settings</a>
     <form method="post" action="/wan-kaggle/connect" data-kaggle-connect>
       <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
       <p class="small">Create a token in <a href="https://www.kaggle.com/settings/api" target="_blank" rel="noopener noreferrer">Kaggle API settings</a>.</p>
       <label class="small d-block mb-2">Kaggle username<input name="username" required autocomplete="username" class="nle-input w-100"></label>
-      <label class="small d-block mb-2">Credential type<select name="kind" class="nle-select w-100"><option value="token">API token</option><option value="legacy">Legacy API key (kaggle.json)</option></select></label>
+      <label class="small d-block mb-2">Credential type<select name="kind" class="nle-select w-100"><option value="auto">Detect automatically</option><option value="token">API token</option><option value="legacy">Legacy API key (kaggle.json)</option></select></label>
       <label class="small d-block mb-2">API token or key<input type="password" name="secret" required autocomplete="new-password" class="nle-input w-100"></label>
       <button type="submit" class="nle-btn w-100">Connect Kaggle</button>
     </form>
