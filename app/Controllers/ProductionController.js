@@ -607,6 +607,9 @@ export class ProductionController extends Controller {
         hasCharacters: characterRows.length > 0,
         editHref: `/scenes/${row.id}/edit`,
         renderAction: `/scenes/${row.id}/render`,
+        renderBusy: ["Rendering", "Processing"].includes(row.status),
+        kaggleRender: String(row.generation_job_id ?? "").startsWith("kaggle:"),
+        videoEditorHref: `/projects/${row.project_id}/videoeditor?scene_id=${row.id}`,
         seedanceAction: `/scenes/${row.id}/generate-seedance`,
         syncAction: `/scenes/${row.id}/sync-render`,
         deleteAction: `/scenes/${row.id}/delete`
@@ -1125,7 +1128,12 @@ export class ProductionController extends Controller {
 
   async renderScene(provider = "configured") {
     const scene = await this.findOwned("scenes", this.params.id);
-    if (["Rendering", "Processing"].includes(scene.status)) return this.abort(409, "This scene already has a running generation job.");
+    if (["Rendering", "Processing"].includes(scene.status)) {
+      const message = "This scene already has a running generation job.";
+      if (!this.wantsHtml) return this.json({ message, status: scene.status }, 409);
+      flash(this.context, message);
+      return redirect(this.context, `/scenes/${scene.id}`);
+    }
     const characters = await this.db.query(
       "SELECT c.* FROM characters c INNER JOIN character_scene cs ON cs.character_id = c.id WHERE cs.scene_id = ?",
       [scene.id]
@@ -1149,7 +1157,16 @@ export class ProductionController extends Controller {
 
   async syncSceneRender() {
     const scene = await this.findOwned("scenes", this.params.id);
-    if (!scene.generation_job_id) return this.abort(409, "This scene has no ComfyUI render job.");
+    if (scene.generation_job_id?.startsWith("kaggle:")) {
+      if (!this.wantsHtml) return this.json({ message: "Check this render through Kaggle progress." }, 409);
+      return redirect(this.context, `/projects/${scene.project_id}/videoeditor?scene_id=${scene.id}`);
+    }
+    if (!scene.generation_job_id) {
+      const message = "This scene has no ComfyUI render job.";
+      if (!this.wantsHtml) return this.json({ message }, 409);
+      flash(this.context, message);
+      return redirect(this.context, `/scenes/${scene.id}`);
+    }
     const local = scene.generation_job_id.startsWith("local:");
     const service = local ? this.service("comfyLocal")() : this.comfy;
     let videoPath;

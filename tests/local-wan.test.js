@@ -35,8 +35,12 @@ test("local jobs retain their worker when importing completed video", async () =
     submitScene: async () => "job-123",
     downloadCompletedVideo: async id => { imported = id; return "uploads/scenes/comfy-job-123.webm"; }
   };
-  const controller = new ProductionController({
+  const headers = {};
+  const context = {
     request: { headers: { accept: "application/json" } }, params: { id: "9" },
+    session: {},
+    response: { setHeader: (name, value) => { headers[name] = value; } },
+    text: (_body, status) => ({ status }),
     service: name => {
       if (name === "db") return { query: async () => [] };
       if (name === "comfyLocal") return () => local;
@@ -44,17 +48,31 @@ test("local jobs retain their worker when importing completed video", async () =
     },
     json: (body, status) => ({ body, status }),
     abort: (status, message) => { throw new Error(`${status} ${message}`); }
-  });
+  };
+  const controller = new ProductionController(context);
   controller.findOwned = async () => scene;
   Object.defineProperty(controller, "models", { value: { scenes: { update: async (_id, values) => { writes.push(values); Object.assign(scene, values); } } } });
   const result = await controller.renderLocalScene();
   assert.equal(result.status, 202);
   assert.equal(writes[0].generation_job_id, "local:job-123");
-  await assert.rejects(() => controller.renderLocalScene(), /409.*already/);
+  const conflict = await controller.renderLocalScene();
+  assert.equal(conflict.status, 409);
+  assert.match(conflict.body.message, /already/);
+  context.request.headers.accept = "text/html";
+  assert.equal((await controller.renderScene()).status, 303);
+  assert.equal(headers.Location, "/scenes/9");
+  assert.match(context.session.flash, /already/);
+  assert.equal(writes.length, 1);
+  context.request.headers.accept = "application/json";
   await controller.syncSceneRender();
   assert.equal(imported, "job-123");
   assert.equal(scene.status, "Ready");
   assert.equal(scene.video_path, "uploads/scenes/comfy-job-123.webm");
+  scene.generation_job_id = "kaggle:owner/notebook";
+  context.request.headers.accept = "text/html";
+  assert.equal((await controller.syncSceneRender()).status, 303);
+  assert.equal(headers.Location, "/projects/2/videoeditor?scene_id=9");
+  assert.equal(writes.length, 2);
 });
 
 test("ComfyUI image previews are not mistaken for completed video", async () => {

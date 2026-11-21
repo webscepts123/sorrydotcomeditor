@@ -78,12 +78,18 @@ html lang="en"
               video controls="controls" src="{{videoUrl}}"
             div.action-row
               a.primary-link href="{{editHref}}" "Edit sequence"
-              form method="post" action="{{renderAction}}"
-                button.primary type="submit" "Queue ComfyUI render"
+              if renderBusy
+                p.muted "A generation job is already running."
+              else
+                form method="post" action="{{renderAction}}"
+                  button.primary type="submit" "Queue ComfyUI render"
               form method="post" action="{{seedanceAction}}"
                 button.secondary type="submit" "Generate with Seedance"
-              form method="post" action="{{syncAction}}"
-                button.secondary type="submit" "Check render status"
+              if kaggleRender
+                a.nav-link href="{{videoEditorHref}}" "Check Kaggle progress in video editor"
+              else if scene.generation_job_id
+                form method="post" action="{{syncAction}}"
+                  button.secondary type="submit" "Check render status"
               form method="post" action="{{deleteAction}}"
                 button.danger type="submit" "Delete sequence"
           h2 "Assigned cast"
