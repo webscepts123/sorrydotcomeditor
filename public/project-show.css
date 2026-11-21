@@ -13,6 +13,7 @@
   gap: 20px;
   animation: ps-rise .35s ease-out both;
 }
+.ps-page > *, .ps-layout > *, .ps-side > * { min-width: 0; }
 @keyframes ps-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 .ps-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background .15s, color .15s, border-color .15s, transform .1s; }
@@ -173,6 +174,13 @@
   .ps-scene-meta { grid-column: 2; grid-row: 2; }
   .ps-scene-arrow { grid-column: 3; grid-row: 1 / span 2; }
   .ps-hero-actions .ps-btn { flex: 1 1 auto; }
+  .ps-hero-actions form { flex: 1 1 100%; }
+  .ps-hero-actions form .ps-btn { width: 100%; }
+  .ps-filters { display: flex; flex-wrap: nowrap; width: 100%; overflow-x: auto; }
+  .ps-filter { flex: 1 0 auto; }
+  .ps-panel { padding: 16px; }
+  .ps-panel-head { flex-wrap: wrap; }
+  .page-heading { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ps-page, .ps-page * { animation: none !important; transition: none !important; }
