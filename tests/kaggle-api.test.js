@@ -61,6 +61,29 @@ test("Kaggle submission reserves the scene and runs a private notebook without i
   assert.deepEqual(await readdir(path.join(service.root, "jobs")), []);
 });
 
+test("a saved notebook can replace a stale render on the same scene", async t => {
+  let state = "draft";
+  const writes = [];
+  const database = { query: async (_sql, values) => {
+    writes.push(values);
+    return { affectedRows: 1 };
+  } };
+  const service = await fixture(t, async data => {
+    if (data.action !== "status") return {};
+    assert.equal(data.kernel, "filmmaker/notebook123");
+    return { status: state };
+  }, database);
+  await service.connect(2, { username: "filmmaker", secret: "private-token" });
+  const scene = { id: 5, status: "Processing", generation_job_id: "old-render" };
+  const url = "https://www.kaggle.com/code/filmmaker/notebook123/edit";
+  await assert.rejects(() => service.linkNotebook(2, scene, url), /Save a Kaggle version/);
+  await assert.rejects(() => service.linkNotebook(2, scene, url.replace("filmmaker", "different")), /owns this notebook/);
+  assert.equal(writes.length, 0);
+  state = "queued";
+  await service.linkNotebook(2, scene, url);
+  assert.deepEqual(writes, [["kaggle:filmmaker/notebook123", 5, "Processing", "old-render", null]]);
+});
+
 test("Kaggle completed output attaches only to its matching scene job", async t => {
   const jobId = "kaggle:filmmaker/void-scene-9-abcdef123456";
   const writes = [];

@@ -92,6 +92,15 @@ html lang="en"
                   button.secondary type="submit" "Check render status"
               form method="post" action="{{deleteAction}}"
                 button.danger type="submit" "Delete sequence"
+          form.form-card method="post" action="{{linkNotebookAction}}"
+            h2 "Link a Kaggle notebook"
+            p.muted "In Kaggle, use Save Version with Run All to start a saved run. Once it is queued, link the notebook to import its 1080p MP4 automatically."
+            a.nav-link href="{{videoEditorHref}}" "Connect Kaggle in the video editor"
+            label for="notebook-url" "Kaggle notebook URL"
+            input#notebook-url type="url" name="notebook_url" required="required" maxlength="400" placeholder="https://www.kaggle.com/code/username/notebook"
+            if renderBusy
+              p.muted "Linking switches scene tracking to Kaggle. The previous worker may continue running."
+            button.secondary type="submit" "Link Kaggle run"
           h2 "Assigned cast"
           if hasCharacters
             for character in characters

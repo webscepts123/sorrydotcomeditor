@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { importKaggleVideo } from "./KaggleVideoImport.js";
 
 const bridge = fileURLToPath(new URL("../../scripts/kaggle-api.py", import.meta.url));
-const validKernel = /^[a-zA-Z0-9_-]+\/void-scene-\d+-[a-f0-9]{12}$/;
+const validKernel = /^[a-zA-Z0-9_-]{1,64}\/[a-zA-Z0-9_-]{1,150}$/;
 
 export function runKaggle(payload, timeout = 90000) {
   const hosted = "/home/studiosorrydotco/apps/sorrydotcomeditor/shared/kaggle-venv/bin/python";
@@ -104,6 +104,27 @@ export class KaggleApiService {
     } finally { await rm(directory, { recursive: true, force: true }); }
     return { job_id: jobId, status: "Rendering", notebook_url: `https://www.kaggle.com/code/${kernel}` };
   }
+  async linkNotebook(userId, scene, notebookUrl) {
+    const match = /^https:\/\/(?:www\.)?kaggle\.com\/code\/([^/?#]+\/[^/?#]+)(?:\/edit)?\/?(?:[?#].*)?$/.exec(String(notebookUrl ?? "").trim());
+    const kernel = match?.[1] ?? "";
+    if (!validKernel.test(kernel)) throw new Error("Enter a Kaggle notebook URL.");
+    const credentials = await this.credentials(userId);
+    if (!credentials || kernel.split("/")[0] !== credentials.username) throw new Error("Connect the Kaggle account that owns this notebook in the video editor.");
+    const jobId = `kaggle:${kernel}`;
+    if (["Rendering", "Processing"].includes(scene.status) && scene.generation_job_id?.startsWith("kaggle:") && scene.generation_job_id !== jobId) {
+      throw new Error("This scene already tracks another active Kaggle run.");
+    }
+    const { status } = await this.run({ action: "status", credentials, kernel });
+    if (!["queued", "running", "complete", "completed"].includes(status)) {
+      throw new Error("Save a Kaggle version with Run All and link it after Kaggle queues the run.");
+    }
+    const result = await this.database.query(
+      "UPDATE scenes SET status = 'Rendering', generation_job_id = ?, seedance_job_id = NULL, generation_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = ? AND generation_job_id <=> ? AND seedance_job_id <=> ?",
+      [jobId, scene.id, scene.status, scene.generation_job_id ?? null, scene.seedance_job_id ?? null]
+    );
+    if (!result.affectedRows) throw new Error("The scene changed while linking. Refresh the scene and try again.");
+  }
+
   async sync(userId, scene) {
     const jobId = String(scene.generation_job_id || ""), kernel = jobId.slice(7);
     if (!jobId.startsWith("kaggle:") || !validKernel.test(kernel)) throw new Error("This scene has no Kaggle API job.");

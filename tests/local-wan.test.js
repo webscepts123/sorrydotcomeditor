@@ -42,7 +42,14 @@ test("local jobs retain their worker when importing completed video", async () =
     response: { setHeader: (name, value) => { headers[name] = value; } },
     text: (_body, status) => ({ status }),
     service: name => {
-      if (name === "db") return { query: async () => [] };
+      if (name === "db") return { query: async (sql, values) => {
+        if (!sql.startsWith("UPDATE scenes")) return [];
+        assert.equal(values[2], scene.generation_job_id);
+        const update = { video_path: values[0], status: "Ready", generation_error: null };
+        writes.push(update);
+        Object.assign(scene, update);
+        return { affectedRows: 1 };
+      } };
       if (name === "comfyLocal") return () => local;
       throw new Error(`Unexpected service: ${name}`);
     },

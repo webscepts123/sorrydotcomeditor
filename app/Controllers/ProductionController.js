@@ -613,6 +613,7 @@ export class ProductionController extends Controller {
         videoEditorHref: `/projects/${row.project_id}/videoeditor?scene_id=${row.id}`,
         seedanceAction: `/scenes/${row.id}/generate-seedance`,
         syncAction: `/scenes/${row.id}/sync-render`,
+        linkNotebookAction: `/scenes/${row.id}/link-kaggle-notebook`,
         deleteAction: `/scenes/${row.id}/delete`
       });
     }
@@ -1042,6 +1043,17 @@ export class ProductionController extends Controller {
     catch (error) { return this.json({ message: error.message }, 503); }
   }
 
+  async linkKaggleNotebook() {
+    const scene = await this.findOwned("scenes", this.params.id);
+    try {
+      await this.service("kaggle").linkNotebook(this.context.session.userId, scene, this.body?.notebook_url);
+      flash(this.context, "Kaggle notebook linked. The studio will import its 1080p MP4 when the saved run finishes.");
+    } catch (error) {
+      flash(this.context, error.message);
+    }
+    return redirect(this.context, `/scenes/${scene.id}`);
+  }
+
   async kaggleSceneProgress() {
     const scene = await this.findOwned("scenes", this.params.id);
     this.context.response.setHeader("Cache-Control", "private, no-store");
@@ -1194,7 +1206,16 @@ export class ProductionController extends Controller {
       }
       return this.json({ scene_id: scene.id, status: scene.status, pending: true }, 202);
     }
-    await this.models.scenes.update(scene.id, { video_path: videoPath, status: "Ready", generation_error: null });
+    const updated = await this.db.query(
+      "UPDATE scenes SET video_path = ?, status = 'Ready', generation_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND generation_job_id = ?",
+      [videoPath, scene.id, scene.generation_job_id]
+    );
+    if (!updated.affectedRows) {
+      const message = "Scene render tracking changed while checking the worker.";
+      if (!this.wantsHtml) return this.json({ message }, 409);
+      flash(this.context, message);
+      return redirect(this.context, `/scenes/${scene.id}`);
+    }
     if (this.wantsHtml) {
       flash(this.context, "Scene render completed.");
       if (local) return redirect(this.context, `/projects/${scene.project_id}/videoeditor?scene_id=${scene.id}`);
@@ -1564,6 +1585,7 @@ export function registerProductionRoutes(app) {
   app.post("/scenes/:id/render", ProductionController.handle("renderScene"));
   app.post("/scenes/:id/render-local", ProductionController.handle("renderLocalScene"));
   app.post("/scenes/:id/generate-seedance", ProductionController.handle("generateSeedanceForScene"));
+  app.post("/scenes/:id/link-kaggle-notebook", ProductionController.handle("linkKaggleNotebook"));
   app.post("/scenes/:id/sync-render", ProductionController.handle("syncSceneRender"));
   app.post("/scenes/:id/attach-video", ProductionController.handle("attachVideo"));
   app.post("/posters/generate-ideas", ProductionController.handle("generatePosterIdeas"));
