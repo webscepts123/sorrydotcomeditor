@@ -104,7 +104,7 @@ html lang="en"
                   a.render-progress-notebook href="#" target="_blank" rel="noopener" hidden="hidden" "Open Kaggle notebook ↗"
             if videoUrl
               div.scene-preview
-                a.nav-link href="{{videoUrl}}" data-scene-video "Open rendered clip"
+                a.nav-link href="{{videoUrl}}" data-scene-video="true" "Open rendered clip"
             div.action-row
               a.primary-link href="{{editHref}}" "Edit sequence"
               if renderBusy
