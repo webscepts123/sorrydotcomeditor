@@ -589,6 +589,12 @@ export class ProductionController extends Controller {
       });
     }
     if (path === "scenes") {
+      // Seedance was removed; release scenes still locked by an old Seedance job.
+      if (row.status === "Processing" && row.seedance_job_id && !row.generation_job_id) {
+        await this.db.query("UPDATE scenes SET status = 'pending', seedance_job_id = NULL WHERE id = ? AND status = 'Processing' AND generation_job_id IS NULL", [row.id]);
+        row.status = "pending";
+        row.seedance_job_id = null;
+      }
       const [projectRows, characterRows] = await Promise.all([
         this.db.query("SELECT title FROM projects WHERE id = ? LIMIT 1", [row.project_id]),
         this.db.query(
@@ -611,8 +617,8 @@ export class ProductionController extends Controller {
         renderBusy: ["Rendering", "Processing"].includes(row.status),
         kaggleRender: String(row.generation_job_id ?? "").startsWith("kaggle:"),
         videoEditorHref: `/projects/${row.project_id}/videoeditor?scene_id=${row.id}`,
-        seedanceAction: `/scenes/${row.id}/generate-seedance`,
         syncAction: `/scenes/${row.id}/sync-render`,
+        progressUrl: `/scenes/${row.id}/progress`,
         deleteAction: `/scenes/${row.id}/delete`
       });
     }
@@ -650,7 +656,6 @@ export class ProductionController extends Controller {
       editHref: `/${path}/${row.id}/edit`,
       renderAction: path === "scenes" ? `/scenes/${row.id}/render` : "",
       syncAction: path === "scenes" ? `/scenes/${row.id}/sync-render` : "",
-      seedanceAction: path === "scenes" ? `/scenes/${row.id}/generate-seedance` : "",
       prepareAction: path === "characters" ? `/characters/${row.id}/sync-face` : "",
       posterAction: path === "projects" ? `/projects/${row.id}/generate-poster` : "",
       imageAction: path === "characters" ? `/characters/${row.id}/generate-image` : "",
@@ -907,97 +912,6 @@ export class ProductionController extends Controller {
     return this.json(details);
   }
 
-  async generateSceneVideo() {
-    const projectId = routeId(this.body?.project_id);
-    const segment = String(this.body?.script_segment ?? "").trim();
-    const characterIds = stringArray(this.body?.characters);
-    if (!projectId || !segment || characterIds.length === 0) return this.abort(422, "Choose a project, add a scene description, and select at least one character.");
-    if (characterIds.length > 100) return this.abort(422, "A scene cannot have more than 100 assigned characters.");
-    const project = await this.findOwned("projects", projectId);
-    const characters = await this.db.query(
-      `SELECT * FROM characters WHERE id IN (${characterIds.map(() => "?").join(",")}) AND (project_id = ? OR project_id IS NULL)`,
-      [...characterIds, project.id]
-    );
-    if (characters.length !== new Set(characterIds).size) return this.abort(422, "Selected characters must belong to this project.");
-    const prompt = this.seedancePrompt(segment, characters);
-    const apiKey = process.env.SEEDANCE_API_KEY;
-    const baseUrl = process.env.SEEDANCE_BASE_URL;
-    if (!apiKey || !baseUrl) return this.abort(503, "Configure SEEDANCE_API_KEY and SEEDANCE_BASE_URL before generating scenes.");
-    let data;
-    try {
-      data = await this.submitSeedance(prompt, apiKey, baseUrl);
-    } catch (error) {
-      return this.abort(error.message.startsWith("Configure SEEDANCE") ? 503 : 502, error.message);
-    }
-    const jobId = data?.id ?? data?.job_id ?? null;
-    const created = await this.models.scenes.create({
-      project_id: project.id,
-      order_index: Number(this.body?.order_index) || 1,
-      script_segment: segment,
-      prompt,
-      video_url: data?.output?.[0] ?? null,
-      seedance_job_id: jobId,
-      status: "Processing"
-    });
-    await this.syncSceneCharacters(created.id, project.id, characterIds);
-    await this.db.query("UPDATE projects SET total_scenes = (SELECT COUNT(*) FROM scenes WHERE project_id = ?), updated_at = CURRENT_TIMESTAMP WHERE id = ?", [project.id, project.id]);
-    return this.json({ id: created.id, job_id: jobId, video_url: created.video_url, status: created.status }, 202);
-  }
-
-  seedancePrompt(segment, characters) {
-    const cast = characters.map((character) => [
-      `CHARACTER NAME: ${character.name}`,
-      `ROLE: ${character.role ?? ""}`,
-      `AI TAG: ${character.ai_tag ?? ""}`,
-      `CHARACTER PROMPT: ${character.prompt ?? ""}`
-    ].join("\n")).join("\n\n");
-    return [
-      "SEEDANCE 2.0 CINEMATIC SCENE GENERATION",
-      `SCENE ACTION:\n${segment}`,
-      `CAST:\n${cast}`,
-      "Ultra-realistic live-action cinematic Sri Lankan movie scene. Real human actors, natural motion, emotional acting, film-grade lighting and a 24fps movie look.",
-      "No anime, cartoons, 3D renders, illustrations, game characters, logos or watermarks.",
-      "Create a 6-second cinematic cutscene suitable for a movie trailer."
-    ].join("\n\n");
-  }
-
-  async submitSeedance(prompt, apiKey = process.env.SEEDANCE_API_KEY, baseUrl = process.env.SEEDANCE_BASE_URL) {
-    if (!apiKey || !baseUrl) throw new Error("Configure SEEDANCE_API_KEY and SEEDANCE_BASE_URL before generating scenes.");
-    const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/text2video`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ key: apiKey, prompt, width: 1024, height: 576, duration: 6, guidance_scale: 7.5 }),
-      signal: AbortSignal.timeout(300000)
-    });
-    const data = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(data?.message ?? "Seedance scene generation failed.");
-    return data;
-  }
-
-  async generateSeedanceForScene() {
-    const scene = await this.findOwned("scenes", this.params.id);
-    const characters = await this.db.query(
-      "SELECT c.* FROM characters c INNER JOIN character_scene cs ON cs.character_id = c.id WHERE cs.scene_id = ?",
-      [scene.id]
-    );
-    if (!characters.length) return this.abort(422, "Assign at least one character before generating the scene.");
-    let data;
-    try {
-      data = await this.submitSeedance(this.seedancePrompt(scene.script_segment, characters));
-    } catch (error) {
-      return this.abort(error.message.startsWith("Configure SEEDANCE") ? 503 : 502, error.message);
-    }
-    const jobId = data?.id ?? data?.job_id ?? null;
-    await this.models.scenes.update(scene.id, {
-      prompt: this.seedancePrompt(scene.script_segment, characters),
-      video_url: data?.output?.[0] ?? null,
-      seedance_job_id: jobId,
-      status: "Processing"
-    });
-    flash(this.context, "Seedance scene generation submitted.");
-    return redirect(this.context, `/scenes/${scene.id}`);
-  }
-
   async localWanStatus() {
     this.context.response.setHeader("Cache-Control", "no-store");
     try {
@@ -1049,6 +963,63 @@ export class ProductionController extends Controller {
     if (scene.status === "failed") return this.json({ status: "failed", message: scene.generation_error, notebook_url: `https://www.kaggle.com/code/${scene.generation_job_id.slice(7)}` });
     try { return this.json(await this.service("kaggle").sync(this.context.session.userId, scene)); }
     catch (error) { return this.json({ message: error.message, pending: true }, 502); }
+  }
+
+  // Live progress for the scene page. Remote providers are checked at most every
+  // 20 seconds per scene so polling browsers cannot flood Kaggle or ComfyUI.
+  async sceneProgress() {
+    let scene = await this.findOwned("scenes", this.params.id);
+    this.context.response.setHeader("Cache-Control", "private, no-store");
+    const jobId = String(scene.generation_job_id || "");
+    const provider = jobId.startsWith("kaggle:") ? "kaggle"
+      : jobId.startsWith("local:") ? "local"
+      : jobId ? "comfy" : "none";
+    const etaSeconds = { kaggle: 1500, local: 600, comfy: 420, none: 300 }[provider];
+    let remoteStatus = null, message = null, notebookUrl = provider === "kaggle" ? `https://www.kaggle.com/code/${jobId.slice(7)}` : null;
+    const busy = () => ["Rendering", "Processing"].includes(scene.status);
+    const checks = ProductionController.progressChecks ??= new Map();
+    const last = checks.get(scene.id) ?? 0;
+    if (busy() && ["kaggle", "local", "comfy"].includes(provider) && Date.now() - last >= 20000) {
+      checks.set(scene.id, Date.now());
+      try {
+        if (provider === "kaggle") {
+          const result = await this.service("kaggle").sync(this.context.session.userId, scene);
+          remoteStatus = result?.status ?? null;
+          if (result?.message) message = result.message;
+        } else {
+          const service = provider === "local" ? this.service("comfyLocal")() : this.comfy;
+          const videoPath = await service.downloadCompletedVideo(provider === "local" ? jobId.slice(6) : jobId);
+          if (videoPath) await this.models.scenes.update(scene.id, { video_path: videoPath, status: "Ready", generation_error: null });
+          remoteStatus = videoPath ? "complete" : "running";
+        }
+      } catch (error) {
+        if (error instanceof ComfyRenderFailedError) {
+          await this.db.query("UPDATE scenes SET status = 'failed', generation_error = ? WHERE id = ? AND generation_job_id = ? AND status IN ('Rendering', 'Processing')", [error.message, scene.id, jobId]);
+        } else {
+          message = `Status check failed, retrying: ${error.message}`;
+        }
+      }
+      scene = await this.findOwned("scenes", scene.id);
+    }
+    const ready = Boolean(scene.video_path) && !busy();
+    const failed = String(scene.status).toLowerCase() === "failed";
+    if (failed) message = scene.generation_error || "Generation failed.";
+    const startedAt = scene.updated_at ? new Date(scene.updated_at) : null;
+    return this.json({
+      status: scene.status,
+      provider,
+      busy: busy(),
+      ready,
+      failed,
+      remote_status: remoteStatus,
+      message,
+      eta_seconds: etaSeconds,
+      started_at: startedAt && !Number.isNaN(startedAt.getTime()) ? startedAt.toISOString() : null,
+      server_time: new Date().toISOString(),
+      next_check_seconds: Math.max(0, Math.ceil((20000 - (Date.now() - (checks.get(scene.id) ?? 0))) / 1000)),
+      video_url: mediaUrl(scene.video_path) || scene.video_url || null,
+      notebook_url: notebookUrl
+    });
   }
 
   async kaggleScene() {
@@ -1422,7 +1393,7 @@ export class ProductionController extends Controller {
   }
 
   async settings() {
-    const variables = ["APP_NAME", "APP_URL", "DB_TYPE", "DB_HOST", "DB_NAME", "AI_ENABLED", "AI_PROVIDER", "SEEDANCE_BASE_URL", "COMFYUI_URL"];
+    const variables = ["APP_NAME", "APP_URL", "DB_TYPE", "DB_HOST", "DB_NAME", "AI_ENABLED", "AI_PROVIDER", "COMFYUI_URL"];
     return this.render("settings", {
       message: takeFlash(this.context),
       navigation,
@@ -1560,11 +1531,10 @@ export function registerProductionRoutes(app) {
   app.get("/characters/:id/export", ProductionController.handle("exportCharacter"));
   app.post("/planning/generate-story", ProductionController.handle("generateStory"));
   app.post("/tools/script/parse", ProductionController.handle("parseScript"));
-  app.post("/scenes/generate-video", ProductionController.handle("generateSceneVideo"));
   app.post("/scenes/:id/render", ProductionController.handle("renderScene"));
   app.post("/scenes/:id/render-local", ProductionController.handle("renderLocalScene"));
-  app.post("/scenes/:id/generate-seedance", ProductionController.handle("generateSeedanceForScene"));
-  app.post("/scenes/:id/sync-render", ProductionController.handle("syncSceneRender"));
+  app.get("/scenes/:id/progress", ProductionController.handle("sceneProgress"));
+  app.post("/scenes/:id/sync-render",ProductionController.handle("syncSceneRender"));
   app.post("/scenes/:id/attach-video", ProductionController.handle("attachVideo"));
   app.post("/posters/generate-ideas", ProductionController.handle("generatePosterIdeas"));
   app.post("/posters/generate", ProductionController.handle("generatePoster"));

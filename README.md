@@ -20,7 +20,7 @@ npm.cmd run dev
 
 Configure database credentials in `.env` before migrating. On a new database, create the first administrator from the one-time setup page. Existing Laravel bcrypt password hashes remain usable. Set a strong, private `APP_KEY` before deploying. Never commit `.env` or provider credentials.
 
-AI story and character tools use the optional Noderyx AI configuration. Image generation requires `OPENAI_API_KEY`. Scene video generation can use `SEEDANCE_API_KEY` and `SEEDANCE_BASE_URL`; ComfyUI rendering needs `COMFYUI_URL` and a ComfyUI API-format workflow at `COMFYUI_VIDEO_WORKFLOW`. Configure provider services before using their respective actions.
+AI story and character tools use the optional Noderyx AI configuration. Image generation requires `OPENAI_API_KEY`. ComfyUI scene rendering needs `COMFYUI_URL` and a ComfyUI API-format workflow at `COMFYUI_VIDEO_WORKFLOW`. Configure provider services before using their respective actions.
 
 The dashboard checks the configured ComfyUI worker every five seconds and shows available GPU, memory, and queue metrics. Storage usage refers to the filesystem hosting the application, not the remote worker. The timeline percentage is an estimate based on 15 minutes per scene and a 150-minute target.
 

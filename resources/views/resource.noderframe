@@ -61,9 +61,6 @@ html lang="en"
         if syncAction
           form method="post" action="{{syncAction}}"
             button.secondary type="submit" "Check render status"
-        if seedanceAction
-          form method="post" action="{{seedanceAction}}"
-            button.primary type="submit" "Generate with Seedance"
         if prepareAction
           form method="post" action="{{prepareAction}}"
             button.secondary type="submit" "Prepare for face sync"

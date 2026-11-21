@@ -5,6 +5,7 @@ html lang="en"
     title "{{title}} — Production Hub"
     link rel="stylesheet" href="/public/app.css"
     script src="/public/navigation.js" defer="defer"
+    script src="/public/scene-progress.js" defer="defer"
   body
     div.app-shell
       nav.side-nav
@@ -74,6 +75,27 @@ html lang="en"
             p.muted "{{scene.script_segment}}"
             span.status "{{scene.status}}"
             p "Project: {{projectTitle}}"
+            if renderBusy
+              section.render-progress data-progress-url="{{progressUrl}}" aria-live="polite"
+                div.render-progress-head
+                  strong.render-progress-title "Generating scene"
+                  span.render-progress-percent "0%"
+                div.render-progress-track role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Scene generation progress" title="Click to check now"
+                  div.render-progress-fill
+                ol.render-progress-steps
+                  li data-step="queued" "Queued"
+                  li data-step="running" "Generating"
+                  li data-step="downloading" "Importing"
+                  li data-step="ready" "Ready"
+                div.render-progress-meta
+                  span.render-progress-elapsed "Elapsed 0:00"
+                  span.render-progress-eta "Estimating…"
+                  span.render-progress-next ""
+                p.render-progress-message.muted "Connecting to the render job…"
+                div.render-progress-actions
+                  button.secondary.render-progress-check type="button" "Check now"
+                  button.secondary.render-progress-toggle type="button" aria-pressed="false" "Pause auto-refresh"
+                  a.nav-link.render-progress-notebook href="#" target="_blank" rel="noopener" hidden="hidden" "Open Kaggle notebook"
             if videoUrl
               video controls="controls" src="{{videoUrl}}"
             div.action-row
@@ -83,8 +105,6 @@ html lang="en"
               else
                 form method="post" action="{{renderAction}}"
                   button.primary type="submit" "Queue ComfyUI render"
-              form method="post" action="{{seedanceAction}}"
-                button.secondary type="submit" "Generate with Seedance"
               if kaggleRender
                 a.nav-link href="{{videoEditorHref}}" "Check Kaggle progress in video editor"
               else if scene.generation_job_id
