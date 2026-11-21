@@ -1038,7 +1038,7 @@ export class ProductionController extends Controller {
     this.context.response.setHeader("Cache-Control", "private, no-store");
     if (!String(scene.generation_job_id || "").startsWith("kaggle:")) return this.json({ status: scene.status, video_path: mediaUrl(scene.video_path), ready: Boolean(scene.video_path) });
     if (scene.status === "failed") return this.json({ status: "failed", message: scene.generation_error, notebook_url: `https://www.kaggle.com/code/${scene.generation_job_id.slice(7)}` });
-    try { return this.json(await this.service("kaggle").sync(this.context.session.userId, scene)); }
+    try { return this.json(await this.service("kaggle").sync(this.context.session.userId, scene, { download: false })); }
     catch (error) { return this.json({ message: error.message, pending: true }, 502); }
   }
 
@@ -1055,13 +1055,18 @@ export class ProductionController extends Controller {
     let remoteStatus = null, message = null, notebookUrl = provider === "kaggle" ? `https://www.kaggle.com/code/${jobId.slice(7)}` : null;
     const busy = () => ["Rendering", "Processing"].includes(scene.status);
     const checks = ProductionController.progressChecks ??= new Map();
-    const last = checks.get(scene.id) ?? 0;
-    if (busy() && ["kaggle", "local", "comfy"].includes(provider) && Date.now() - last >= 20000) {
-      checks.set(scene.id, Date.now());
+    const previous = checks.get(scene.id);
+    const check = previous?.jobId === jobId ? previous : { jobId, checkedAt: 0, remoteStatus: null, message: null };
+    remoteStatus = check.remoteStatus;
+    message = check.message;
+    if (busy() && ["kaggle", "local", "comfy"].includes(provider) && Date.now() - check.checkedAt >= 20000) {
+      check.checkedAt = Date.now();
+      checks.set(scene.id, check);
+      message = null;
       try {
         if (provider === "kaggle") {
-          const result = await this.service("kaggle").sync(this.context.session.userId, scene);
-          remoteStatus = result?.status ?? null;
+          const result = await this.service("kaggle").sync(this.context.session.userId, scene, { download: false });
+          if (result?.status && result.status !== "checking") remoteStatus = result.status;
           if (result?.message) message = result.message;
         } else {
           const service = provider === "local" ? this.service("comfyLocal")() : this.comfy;
@@ -1085,10 +1090,13 @@ export class ProductionController extends Controller {
           message = `Status check failed, retrying: ${error.message}`;
         }
       }
+      check.remoteStatus = remoteStatus;
+      check.message = message;
       scene = await this.findOwned("scenes", scene.id);
     }
-    const ready = Boolean(scene.video_path) && !busy();
     const failed = String(scene.status).toLowerCase() === "failed";
+    const ready = Boolean(scene.video_path) && !busy() && !failed;
+    if (!busy()) checks.delete(scene.id);
     if (failed) message = scene.generation_error || "Generation failed.";
     const startedAt = scene.updated_at ? new Date(scene.updated_at) : null;
     const elapsedSeconds = startedAt && !Number.isNaN(startedAt.getTime()) ? (Date.now() - startedAt.getTime()) / 1000 : 0;
@@ -1105,7 +1113,7 @@ export class ProductionController extends Controller {
       eta_seconds: etaSeconds,
       started_at: startedAt && !Number.isNaN(startedAt.getTime()) ? startedAt.toISOString() : null,
       server_time: new Date().toISOString(),
-      next_check_seconds: Math.max(0, Math.ceil((20000 - (Date.now() - (checks.get(scene.id) ?? 0))) / 1000)),
+      next_check_seconds: Math.max(0, Math.ceil((check.checkedAt + 20000 - Date.now()) / 1000)),
       video_url: mediaUrl(scene.video_path) || scene.video_url || null,
       notebook_url: notebookUrl
     });

@@ -1,7 +1,5 @@
 // Live, interactive progress bar for scenes with a running generation job.
-// Providers do not report a true percentage, so the bar is estimated from the
-// elapsed time against each provider's typical duration, and snaps to stage
-// milestones (queued / generating / importing / ready) from the server.
+// Show confirmed provider stages and elapsed time.
 (() => {
   const clip = document.querySelector("[data-scene-video]");
   if (clip) {
@@ -36,20 +34,7 @@
   const providerNames = { kaggle: "Kaggle (CogVideoX)", local: "Local Wan 2.1", comfy: "ComfyUI", none: "render worker" };
   const POLL_MS = 8000;
 
-  let state = null, clockOffset = 0, paused = false, timer = null, inFlight = false, shown = 0, done = false;
-  let displayed = 0, frame = null;
-
-  // Count the percentage label up smoothly instead of jumping.
-  const animatePercent = () => {
-    cancelAnimationFrame(frame);
-    const step = () => {
-      const diff = shown - displayed;
-      displayed = Math.abs(diff) < 0.2 ? shown : displayed + diff * 0.12;
-      if (!state?.failed) percentLabel.textContent = `${Math.round(displayed)}%`;
-      if (displayed !== shown) frame = requestAnimationFrame(step);
-    };
-    frame = requestAnimationFrame(step);
-  };
+  let state = null, clockOffset = 0, paused = false, timer = null, inFlight = false, done = false;
 
   const format = (seconds) => {
     seconds = Math.max(0, Math.round(seconds));
@@ -68,41 +53,19 @@
     if (remote === "downloading" || remote === "complete" || remote === "completed") return "downloading";
     if (remote === "queued" || remote === "pending") return "queued";
     if (remote === "running") return "running";
-    return elapsed() < 45 ? "queued" : "running";
+    return null;
   };
 
-  // Ease toward 95% over the provider ETA, then creep slowly so it never stalls visibly.
-  const estimate = () => {
-    if (!state) return 0;
-    if (state.ready) return 100;
-    const eta = state.eta_seconds || 300, t = elapsed();
-    let value = t <= eta ? 90 * (t / eta) : 90 + 8 * (1 - Math.exp(-(t - eta) / eta));
-    const stage = stageOf(state);
-    if (stage === "queued") value = Math.min(value, 8);
-    if (stage === "running") value = Math.max(value, 10);
-    if (stage === "downloading") value = Math.max(value, 92);
-    return Math.min(99, Math.max(2, value));
-  };
-
+  const stageLabels = { queued: "Queued", running: "Generating", downloading: "Importing", ready: "Ready" };
   const paint = () => {
     if (!state) return;
-    const target = estimate();
-    shown = state.failed ? shown : Math.max(shown, target); // never move backwards
-    const pct = Math.round(shown);
-    fill.style.width = `${shown}%`;
-    if (state.failed) percentLabel.textContent = "Failed";
-    else animatePercent();
-    track.setAttribute("aria-valuenow", String(pct));
-    const t = elapsed();
-    elapsedLabel.textContent = `Elapsed ${format(t)}`;
-    if (state.ready) etaLabel.textContent = "Done";
-    else if (state.failed) etaLabel.textContent = "";
-    else {
-      const left = (state.eta_seconds || 300) - t;
-      etaLabel.textContent = state.stalled ? "Stalled" : left > 0 ? `≈ ${format(left)} remaining` : "Taking longer than usual";
-    }
     const stage = state.failed ? null : stageOf(state);
     const current = order.indexOf(stage);
+    percentLabel.textContent = state.failed ? "Failed" : stageLabels[stage] || "Checking";
+    track.setAttribute("aria-valuetext", percentLabel.textContent);
+    fill.style.width = current < 0 ? "0" : ((current + 1) * 25) + "%";
+    elapsedLabel.textContent = "Elapsed " + format(elapsed());
+    etaLabel.textContent = state.stalled && !state.failed ? "Taking longer than usual" : "";
     panel.classList.toggle("is-queued", stage === "queued");
     stepList.style.setProperty("--rp-steps", String(stage === "ready" ? 3 : Math.max(0, current)));
     steps.forEach((step, index) => {
@@ -117,11 +80,14 @@
     panel.classList.toggle("is-failed", Boolean(data.failed));
     panel.classList.toggle("is-ready", Boolean(data.ready));
     panel.classList.toggle("is-stalled", Boolean(data.stalled) && !data.failed);
-    title.textContent = data.ready ? "Scene ready" : data.failed ? "Generation failed" : data.stalled ? "Job looks stuck" : `Generating with ${providerNames[data.provider] || "render worker"}`;
-    messageLabel.textContent = data.message
-      || (data.ready ? "Video imported. Reloading…"
-        : data.stalled ? "This job has run far longer than expected and may be lost. Cancel it and queue the render again."
-        : "Rendering in progress. You can leave this page — the job keeps running.");
+    title.textContent = data.failed ? "Generation failed" : data.ready ? "Scene ready" : providerNames[data.provider] || "Render worker";
+    const stage = stageOf(data);
+    messageLabel.textContent = data.message || ({
+      queued: "Waiting for the provider to start the render.",
+      running: "The provider is generating the video.",
+      downloading: "The provider finished. The studio is importing the clip.",
+      ready: "Video imported. Reloading?"
+    })[stage] || "Waiting for a provider status update.";
     cancelForm.hidden = !(data.busy && data.stalled);
     if (data.notebook_url) { notebookLink.href = data.notebook_url; notebookLink.hidden = false; }
     nextLabel.textContent = data.busy && data.next_check_seconds ? `Next provider check in ${data.next_check_seconds}s` : "";
@@ -136,7 +102,7 @@
     checkButton.disabled = true; toggleButton.disabled = true;
     cancelForm.hidden = true;
     if (data.ready || !data.failed) {
-      shown = 100; fill.style.width = "100%"; animatePercent();
+      fill.style.width = "100%";
       setTimeout(() => window.location.reload(), 1500);
     } else {
       checkButton.textContent = "Reload page"; checkButton.disabled = false;

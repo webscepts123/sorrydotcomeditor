@@ -6,8 +6,8 @@ html lang="en"
     link rel="stylesheet" href="/public/app.css?v=2"
     script src="/public/navigation.js" defer="defer"
     script src="/public/project-show.js?v=2" defer="defer"
-    link rel="stylesheet" href="/public/scene-progress.css?v=3"
-    script src="/public/scene-progress.js?v=3" defer="defer"
+    link rel="stylesheet" href="/public/scene-progress.css?v=4"
+    script src="/public/scene-progress.js?v=4" defer="defer"
   body
     div.app-shell
       nav.side-nav
@@ -83,8 +83,8 @@ html lang="en"
                   div.render-progress-heading
                     span.render-progress-spinner aria-hidden="true"
                     strong.render-progress-title "Generating scene"
-                  span.render-progress-percent "0%"
-                div.render-progress-track role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Scene generation progress" title="Click to check now"
+                  span.render-progress-percent "Checking"
+                div.render-progress-track role="progressbar" aria-label="Scene generation stage" title="Click to check now"
                   div.render-progress-fill
                 ol.render-progress-steps
                   li data-step="queued" "Queued"

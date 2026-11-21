@@ -24,7 +24,8 @@ export async function importKaggleVideo(database, { sceneId, source, publicRoot 
     const scene = await database.transaction(async connection => {
       const [rows] = await connection.execute("SELECT id, project_id, status, generation_job_id FROM scenes WHERE id = ? FOR UPDATE", [sceneId]);
       if (!rows.length) throw new Error(`Scene ${sceneId} does not exist.`);
-      if (expectedJobId ? rows[0].generation_job_id !== expectedJobId : ["Rendering", "Processing"].includes(rows[0].status)) throw new Error("This scene has a running generation job. Wait for it to finish before importing a video.");
+      const active = ["Rendering", "Processing"].includes(rows[0].status);
+      if (expectedJobId ? !active || rows[0].generation_job_id !== expectedJobId : active) throw new Error("The scene no longer matches the expected running generation job. Refresh its status before importing.");
       await connection.execute("UPDATE scenes SET video_path = ?, status = 'Ready', generation_job_id = NULL, generation_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [relative, sceneId]);
       await connection.execute("UPDATE projects SET completed_clips = (SELECT COUNT(*) FROM scenes WHERE project_id = ? AND video_path IS NOT NULL AND video_path <> ''), updated_at = CURRENT_TIMESTAMP WHERE id = ?", [rows[0].project_id, rows[0].project_id]);
       return rows[0];

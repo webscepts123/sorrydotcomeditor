@@ -42,7 +42,7 @@
 }
 .render-progress-title { font-size: 14px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #fff; }
 .render-progress-percent {
-  font-size: 34px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+  font-size: 20px; font-weight: 700; line-height: 1;
   background: linear-gradient(90deg, #fff, var(--rp-accent)); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 
@@ -141,7 +141,7 @@
 
 @media (max-width: 640px) {
   .render-progress { padding: 16px; }
-  .render-progress-percent { font-size: 26px; }
+  .render-progress-percent { font-size: 14px; }
   .render-progress-steps li { font-size: 9px; letter-spacing: .08em; }
 }
 @media (prefers-reduced-motion: reduce) {

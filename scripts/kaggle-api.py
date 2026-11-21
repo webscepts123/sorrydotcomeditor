@@ -57,10 +57,15 @@ def run(data):
                 files.extend(batch)
                 if not token:
                     break
-            videos = [str(Path(file).resolve()) for file in files if Path(file).is_file()]
+            # The SDK can return its run log alongside files selected by the pattern.
+            videos = {
+                Path(file).resolve()
+                for file in files
+                if Path(file).name.endswith("-1080p.mp4") and Path(file).is_file()
+            }
             if len(videos) != 1:
                 raise BridgeError("The run did not produce one 1080p MP4. Open the Kaggle notebook to inspect its output.")
-            return {"video": videos[0]}
+            return {"video": str(videos.pop())}
         raise ValueError("Unknown action")
 
 

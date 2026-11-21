@@ -123,6 +123,9 @@ test("Kaggle completed output attaches only to its matching scene job", async t 
   assert.equal((await service.sync(2, scene)).pending, true);
   assert.equal(writes.length, 0);
   state = "complete";
+  const completed = await service.sync(2, scene, { download: false });
+  assert.equal(completed.status, "completed");
+  assert.equal(writes.length, 0);
   const result = await service.sync(2, scene);
   assert.equal(result.status, "Ready");
   assert.equal(result.editor_url, "/projects/2/videoeditor?scene_id=9");

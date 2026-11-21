@@ -37,7 +37,7 @@ export function runKaggle(payload, timeout = 90000) {
 
 export class KaggleApiService {
   constructor({ database, root = path.resolve("storage/kaggle-api"), run = runKaggle, appKey = process.env.APP_KEY, publicRoot = path.resolve("public") } = {}) {
-    this.database = database; this.root = root; this.run = run; this.appKey = appKey; this.publicRoot = publicRoot; this.busy = new Set();
+    this.database = database; this.root = root; this.run = run; this.appKey = appKey; this.publicRoot = publicRoot; this.busy = new Map();
   }
   credentialPath(userId) {
     if (!Number.isSafeInteger(Number(userId)) || Number(userId) <= 0) throw new Error("Sign in before connecting Kaggle.");
@@ -136,14 +136,14 @@ export class KaggleApiService {
     if (!result.affectedRows) throw new Error("The scene changed while linking. Refresh the scene and try again.");
   }
 
-  async sync(userId, scene) {
+  async sync(userId, scene, { download = true } = {}) {
     const jobId = String(scene.generation_job_id || ""), kernel = jobId.slice(7);
     if (!jobId.startsWith("kaggle:") || !validKernel.test(kernel)) throw new Error("This scene has no Kaggle API job.");
-    if (this.busy.has(jobId)) return { pending: true, status: "Downloading" };
-    const credentials = await this.credentials(userId);
-    if (!credentials || kernel.split("/")[0] !== credentials.username) throw new Error("Reconnect the Kaggle account used to generate this scene.");
-    this.busy.add(jobId);
+    if (this.busy.has(jobId)) return { pending: true, status: this.busy.get(jobId) };
+    this.busy.set(jobId, "checking");
     try {
+      const credentials = await this.credentials(userId);
+      if (!credentials || kernel.split("/")[0] !== credentials.username) throw new Error("Reconnect the Kaggle account used to generate this scene.");
       const { status } = await this.run({ action: "status", credentials, kernel });
       if (["error", "failed", "cancelled", "canceled", "cancel_acknowledged"].includes(status)) {
         const message = "Kaggle could not finish this scene. Open the notebook for details, then try again.";
@@ -151,6 +151,8 @@ export class KaggleApiService {
         return { status: "failed", message, notebook_url: `https://www.kaggle.com/code/${kernel}` };
       }
       if (status !== "complete" && status !== "completed") return { pending: true, status, notebook_url: `https://www.kaggle.com/code/${kernel}` };
+      if (!download) return { pending: true, status: "completed", message: "Kaggle finished. The studio is waiting to import the video.", notebook_url: `https://www.kaggle.com/code/${kernel}` };
+      this.busy.set(jobId, "Downloading");
       const directory = path.join(this.root, "outputs", randomUUID());
       await mkdir(directory, { recursive: true, mode: 0o700 });
       try {
