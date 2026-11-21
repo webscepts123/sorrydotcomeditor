@@ -3,6 +3,16 @@
 // elapsed time against each provider's typical duration, and snaps to stage
 // milestones (queued / generating / importing / ready) from the server.
 (() => {
+  const clip = document.querySelector("[data-scene-video]");
+  if (clip) {
+    const player = document.createElement("video");
+    player.controls = true;
+    player.preload = "metadata";
+    player.src = clip.href;
+    player.className = "scene-preview-player";
+    clip.before(player);
+  }
+
   const panel = document.querySelector(".render-progress[data-progress-url]");
   if (!panel) return;
 
