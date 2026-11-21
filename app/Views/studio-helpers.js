@@ -15,14 +15,14 @@ export function mediaUrl(value, publicRoot = path.resolve(process.cwd(), "public
   return `/public/${stored ? "storage/" : ""}${relative}`;
 }
 
-export function aiEngineControls(scene, csrfToken) {
+export function aiEngineControls(scene, csrfToken, comfyConfigured) {
   const id = escapeHtml(scene.id);
   const busy = ["Rendering", "Processing"].includes(scene.status);
   return `<div class="ai-engine">
     ${kaggleControls(scene, csrfToken, { inspector: true })}
     <details class="ai-engine-options">
       <summary>ComfyUI</summary>
-      <p>Save the prompt before starting a ComfyUI render.</p>
+      ${comfyConfigured ? `<p>Save the prompt before starting a ComfyUI render.</p>
       <form method="post" action="/scenes/${id}/render">
         <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
         <button type="submit" class="nle-btn w-100" ${busy ? "disabled" : ""}>Render with ComfyUI</button>
@@ -30,7 +30,8 @@ export function aiEngineControls(scene, csrfToken) {
       ${scene.generation_job_id && !/^(kaggle|local):/.test(scene.generation_job_id) ? `<form method="post" action="/scenes/${id}/sync-render">
         <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
         <button type="submit" class="nle-btn w-100">Check ComfyUI render</button>
-      </form>` : ""}
+      </form>` : ""}` : `<p>No ComfyUI worker is connected. Kaggle generation is available through your Kaggle account.</p>
+      <a class="nle-btn" href="/settings#comfyui">Connect a ComfyUI worker</a>`}
     </details>
   </div>`;
 }

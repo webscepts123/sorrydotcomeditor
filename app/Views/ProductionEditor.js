@@ -1,6 +1,6 @@
 // Original VOID SHADOW editor interface, ported from the Blade view.
 import { escapeHtml, mediaUrl, kaggleControls } from "./studio-helpers.js";
-export function renderProductionEditor({ project, scenes, characters = [], currentScene = null, csrfToken = "" }) {
+export function renderProductionEditor({ project, scenes, characters = [], currentScene = null, csrfToken = "", comfyConfigured = false }) {
 const currentSceneId = currentScene?.id;
 const currentSceneIndex = Math.max(0, scenes.findIndex(s => s.id === currentSceneId));
 const clipWidth = 180, playheadLeft = currentSceneIndex * 182;
@@ -22,7 +22,7 @@ output += "        <div class=\"d-flex gap-3\">\n";
 output += "            <a href=\"" + escapeHtml(`/projects/${project.id}/export-xml`) + "\" class=\"btn btn-outline-secondary btn-sm rounded-0 tracking-widest uppercase\">Export XML</a>\n";
 output += "            <form action=\"" + escapeHtml(`/projects/${project.id}/render-batch`) + "\" method=\"POST\" class=\"m-0\" data-studio-submit=\"0\">\n";
 output += "                <input type=\"hidden\" name=\"_csrf\" value=\"" + escapeHtml(csrfToken) + "\">\n";
-output += "                <button id=\"render-batch\" type=\"submit\" class=\"btn btn-white bg-white text-black btn-sm rounded-0 fw-bold tracking-widest px-4\" " + escapeHtml(!scenes.length ? 'disabled' : '') + ">BATCH RENDER (ALL SCENES)</button>\n";
+output += "                <button id=\"render-batch\" type=\"submit\" class=\"btn btn-white bg-white text-black btn-sm rounded-0 fw-bold tracking-widest px-4\" " + escapeHtml(!scenes.length || !comfyConfigured ? 'disabled' : '') + ">BATCH RENDER (ALL SCENES)</button>\n";
 output += "            </form>\n";
 output += "        </div>\n";
 output += "    </div>\n";
@@ -98,12 +98,14 @@ output += "                            \n";
 output += "                            <li><hr class=\"dropdown-divider border-secondary\"></li>\n";
 output += "                            \n";
 output += "                            <li>\n";
+if (comfyConfigured) {
 output += "                                <form action=\"" + escapeHtml(`/scenes/${scene.id}/render`) + "\" method=\"POST\">\n";
 output += "                                    <input type=\"hidden\" name=\"_csrf\" value=\"" + escapeHtml(csrfToken) + "\">\n";
 output += "                                    <button type=\"submit\" class=\"dropdown-item small text-warning uppercase tracking-widest py-2 bg-transparent border-0 w-100 text-start\">\n";
 output += "                                        <i class=\"bi bi-cpu-fill me-2\"></i> Regenerate Seed\n";
 output += "                                    </button>\n";
 output += "                                </form>\n";
+}
 output += "                            </li>\n";
 output += "                            \n";
 output += "                            <li>\n";
@@ -155,13 +157,15 @@ output += "                                \n";
 output += "                            </div>\n";
 output += "                        </form>\n";
 output += "\n";
+if (comfyConfigured) {
 output += "                        <form action=\"" + escapeHtml(`/scenes/${scene.id}/render`) + "\" method=\"POST\" class=\"mt-2\">\n";
 output += "                            <input type=\"hidden\" name=\"_csrf\" value=\"" + escapeHtml(csrfToken) + "\">\n";
 output += "                            <button type=\"submit\" class=\"btn btn-outline-info w-100 btn-sm rounded-0 small uppercase tracking-widest fw-bold py-2\">\n";
 output += "                                <i class=\"bi bi-cpu-fill me-1\"></i> RENDER WITH CONFIGURED COMFYUI\n";
 output += "                            </button>\n";
 output += "                        </form>\n";
-if (scene.generation_job_id) {
+}
+if (comfyConfigured && scene.generation_job_id && !scene.generation_job_id.startsWith("kaggle:")) {
 output += "                            <form action=\"" + escapeHtml(`/scenes/${scene.id}/sync-render`) + "\" method=\"POST\" class=\"mt-2\">\n";
 output += "                                <input type=\"hidden\" name=\"_csrf\" value=\"" + escapeHtml(csrfToken) + "\">\n";
 output += "                                <button type=\"submit\" class=\"btn btn-outline-warning w-100 btn-sm rounded-0 small uppercase tracking-widest\">CHECK RENDER STATUS</button>\n";
