@@ -18,6 +18,10 @@
   const url = panel.dataset.progressUrl;
   const fill = $(".render-progress-fill");
   const track = $(".render-progress-track");
+  const detail = $(".render-progress-detail");
+  const detailLabel = $(".render-progress-detail-label");
+  const detailTrack = $(".render-progress-detail-track");
+  const detailFill = $(".render-progress-detail-fill");
   const percentLabel = $(".render-progress-percent");
   const title = $(".render-progress-title");
   const elapsedLabel = $(".render-progress-elapsed");
@@ -57,6 +61,14 @@
   };
 
   const stageLabels = { queued: "Queued", running: "Generating", downloading: "Importing", ready: "Ready" };
+  const detailLabels = {
+    model_loaded: "Model loaded · generating frames",
+    loading_opening: "Loading the opening-shot model",
+    opening: "Opening shot",
+    loading_main: "Loading the main-shot model",
+    main: "Main shot",
+    exporting: "Exporting the MP4"
+  };
   const paint = () => {
     if (!state) return;
     const stage = state.failed ? null : stageOf(state);
@@ -82,6 +94,18 @@
     panel.classList.toggle("is-stalled", Boolean(data.stalled) && !data.failed);
     title.textContent = data.failed ? "Generation failed" : data.ready ? "Scene ready" : providerNames[data.provider] || "Render worker";
     const stage = stageOf(data);
+    const progress = data.progress_detail;
+    const progressLabel = detailLabels[progress?.stage];
+    detail.hidden = !progressLabel || data.failed || stage === "downloading" || stage === "ready";
+    if (!detail.hidden) {
+      detailLabel.textContent = progress.total ? `${progressLabel} · step ${progress.step} of ${progress.total}` : progressLabel;
+      detailTrack.hidden = !progress.total;
+      if (progress.total) {
+        detailTrack.setAttribute("aria-valuemax", String(progress.total));
+        detailTrack.setAttribute("aria-valuenow", String(progress.step));
+        detailFill.style.width = `${100 * progress.step / progress.total}%`;
+      }
+    }
     messageLabel.textContent = data.message || ({
       queued: "Waiting for the provider to start the render.",
       running: "The provider is generating the video.",

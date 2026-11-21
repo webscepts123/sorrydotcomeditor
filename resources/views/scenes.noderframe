@@ -6,8 +6,8 @@ html lang="en"
     link rel="stylesheet" href="/public/app.css?v=2"
     script src="/public/navigation.js" defer="defer"
     script src="/public/project-show.js?v=2" defer="defer"
-    link rel="stylesheet" href="/public/scene-progress.css?v=4"
-    script src="/public/scene-progress.js?v=4" defer="defer"
+    link rel="stylesheet" href="/public/scene-progress.css?v=5"
+    script src="/public/scene-progress.js?v=5" defer="defer"
   body
     div.app-shell
       nav.side-nav
@@ -95,6 +95,10 @@ html lang="en"
                   span.render-progress-elapsed "Elapsed 0:00"
                   span.render-progress-eta "Estimating…"
                   span.render-progress-next ""
+                div.render-progress-detail hidden="hidden"
+                  p.render-progress-detail-label ""
+                  div.render-progress-detail-track role="progressbar" aria-label="Current shot sampling"
+                    div.render-progress-detail-fill
                 p.render-progress-message.muted "Connecting to the render job…"
                 div.render-progress-actions
                   button.secondary.render-progress-check type="button" "Check now"

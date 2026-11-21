@@ -1081,6 +1081,8 @@ export class ProductionController extends Controller {
     const etaSeconds = { kaggle: 1500, local: 600, comfy: 420, none: 300 }[provider];
     let remoteStatus = null, message = null, notebookUrl = provider === "kaggle" ? `https://www.kaggle.com/code/${jobId.slice(7)}` : null;
     const busy = () => ["Rendering", "Processing"].includes(scene.status);
+    const progressDetail = provider === "kaggle" && busy()
+      ? this.service("kaggle").watchProgress(this.context.session.userId, scene) : null;
     const checks = ProductionController.progressChecks ??= new Map();
     const previous = checks.get(scene.id);
     const check = previous?.jobId === jobId ? previous : { jobId, checkedAt: 0, remoteStatus: null, message: null };
@@ -1136,6 +1138,7 @@ export class ProductionController extends Controller {
       ready,
       failed,
       remote_status: remoteStatus,
+      progress_detail: progressDetail,
       message,
       eta_seconds: etaSeconds,
       started_at: startedAt && !Number.isNaN(startedAt.getTime()) ? startedAt.toISOString() : null,

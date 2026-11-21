@@ -77,6 +77,25 @@ test("Kaggle settings recognize legacy keys and kaggle.json without exposing mis
   ]);
 });
 
+test("Kaggle progress retains the latest reported shot and ignores replayed steps", async t => {
+  let resolveProgress;
+  const sent = new Promise(resolve => { resolveProgress = resolve; });
+  const service = await fixture(t, async (payload, _timeout, onProgress) => {
+    if (payload.action === "verify") return {};
+    assert.equal(payload.action, "progress");
+    onProgress({ stage: "opening", step: 20, total: 25 });
+    onProgress({ stage: "main", step: 5, total: 50 });
+    onProgress({ stage: "opening", step: 25, total: 25 });
+    onProgress({ stage: "main", step: 100, total: 50 });
+    resolveProgress();
+  });
+  await service.connect(2, { username: "filmmaker", secret: "private-token" });
+  const scene = { generation_job_id: "kaggle:filmmaker/scene-5" };
+  assert.equal(service.watchProgress(2, scene), null);
+  await sent;
+  assert.deepEqual(service.watchProgress(2, scene), { stage: "main", step: 5, total: 50 });
+});
+
 test("a saved notebook can replace a stale render on the same scene", async t => {
   let state = "draft";
   const writes = [];

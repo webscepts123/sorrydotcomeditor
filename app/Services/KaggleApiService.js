@@ -8,8 +8,9 @@ import { importKaggleVideo } from "./KaggleVideoImport.js";
 
 const bridge = fileURLToPath(new URL("../../scripts/kaggle-api.py", import.meta.url));
 const validKernel = /^[a-zA-Z0-9_-]{1,64}\/[a-zA-Z0-9_-]{1,150}$/;
+const progressStages = ["model_loaded", "loading_opening", "opening", "loading_main", "main", "exporting"];
 
-export function runKaggle(payload, timeout = 90000) {
+export function runKaggle(payload, timeout = 90000, onProgress) {
   const hosted = "/home/studiosorrydotco/apps/sorrydotcomeditor/shared/kaggle-venv/bin/python";
   const python = process.env.KAGGLE_PYTHON || (existsSync(hosted) ? hosted : process.platform === "win32" ? "python" : "python3");
   return new Promise((resolve, reject) => {
@@ -21,7 +22,22 @@ export function runKaggle(payload, timeout = 90000) {
       error ? reject(error) : resolve(result);
     };
     const timer = setTimeout(() => { child.kill(); finish(new Error("Kaggle request timed out. Check the notebook before retrying.")); }, timeout);
-    child.stdout.on("data", chunk => { output += chunk; if (output.length > 65536) { child.kill(); finish(new Error("Invalid Kaggle response.")); } });
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", chunk => {
+      output += chunk;
+      if (onProgress && output.includes("\n")) {
+        const lines = output.split("\n");
+        output = lines.pop();
+        for (const line of lines) {
+          try {
+            const result = JSON.parse(line);
+            if (result.progress) onProgress(result.progress);
+            else if (result.error || result.complete) finish(result.error ? new Error(result.error) : null, result);
+          } catch { /* Ignore malformed progress events. */ }
+        }
+      }
+      if (output.length > 65536) { child.kill(); finish(new Error("Invalid Kaggle response.")); }
+    });
     child.stderr.on("data", () => {});
     child.stdin.on("error", () => {});
     child.on("error", () => finish(new Error("The server Kaggle runtime is unavailable.")));
@@ -38,6 +54,8 @@ export function runKaggle(payload, timeout = 90000) {
 export class KaggleApiService {
   constructor({ database, root = path.resolve("storage/kaggle-api"), run = runKaggle, appKey = process.env.APP_KEY, publicRoot = path.resolve("public") } = {}) {
     this.database = database; this.root = root; this.run = run; this.appKey = appKey; this.publicRoot = publicRoot; this.busy = new Map();
+    this.progress = new Map();
+    this.progressStreams = 0;
   }
   credentialPath(userId) {
     if (!Number.isSafeInteger(Number(userId)) || Number(userId) <= 0) throw new Error("Sign in before connecting Kaggle.");
@@ -167,6 +185,40 @@ export class KaggleApiService {
         return { ...imported, status: "Ready" };
       } finally { await rm(directory, { recursive: true, force: true }); }
     } finally { this.busy.delete(jobId); }
+  }
+
+  watchProgress(userId, scene) {
+    const jobId = String(scene.generation_job_id ?? "");
+    const kernel = jobId.slice(7);
+    if (!jobId.startsWith("kaggle:") || !validKernel.test(kernel)) return null;
+    const now = Date.now();
+    for (const [id, entry] of this.progress) {
+      if (!entry.active && now - entry.lastSeen > 10 * 60 * 1000) this.progress.delete(id);
+    }
+    const entry = this.progress.get(jobId) ?? { active: false, lastStart: 0, lastSeen: now, latest: null };
+    entry.lastSeen = now;
+    if (this.progress.has(jobId) || this.progress.size < 64) this.progress.set(jobId, entry);
+    else return null;
+    if (!entry.active && this.progressStreams < 3 && now - entry.lastStart >= 40000) {
+      entry.active = true;
+      entry.lastStart = now;
+      this.progressStreams++;
+      this.credentials(userId).then(credentials => {
+        if (!credentials || kernel.split("/")[0] !== credentials.username) return;
+        return this.run({ action: "progress", credentials, kernel }, 40000, ({ stage, step, total } = {}) => {
+          const stageIndex = progressStages.indexOf(stage);
+          if (stageIndex < 0 || !Number.isInteger(step) || !Number.isInteger(total) || step < 0 || total < step || total > 1000) return;
+          const previous = entry.latest;
+          if (!previous || stageIndex > progressStages.indexOf(previous.stage) || (stage === previous.stage && step > previous.step)) {
+            entry.latest = { stage, step, total };
+          }
+        });
+      }).catch(() => { /* Provider stage polling still works without log access. */ }).finally(() => {
+        entry.active = false;
+        this.progressStreams--;
+      });
+    }
+    return entry.latest;
   }
   start() {
     let running = false;
