@@ -229,6 +229,34 @@ function rowForView(row, path) {
   };
 }
 
+function sceneStatusKey(scene) {
+  const status = String(scene.status ?? "").toLowerCase();
+  if (["rendering", "processing", "queued"].includes(status)) return "busy";
+  if (status === "failed") return "failed";
+  if (status === "ready" || status === "completed" || scene.video_path || scene.video_url) return "ready";
+  return "pending";
+}
+
+function summarizeScenes(scenes) {
+  const counts = { ready: 0, busy: 0, failed: 0, pending: 0 };
+  let seconds = 0;
+  for (const scene of scenes) {
+    counts[sceneStatusKey(scene)] += 1;
+    seconds += Number(scene.duration) || 0;
+  }
+  const total = scenes.length;
+  const minutes = Math.floor(seconds / 60);
+  return {
+    total: String(total),
+    ready: String(counts.ready),
+    busy: String(counts.busy),
+    failed: String(counts.failed),
+    pending: String(counts.pending),
+    percent: String(total ? Math.round((counts.ready / total) * 100) : 0),
+    runtime: seconds ? `${minutes}m ${String(seconds % 60).padStart(2, "0")}s` : "—"
+  };
+}
+
 export class ProductionController extends Controller {
   get db() { return this.service("db"); }
   get models() { return repositories(this.db); }
@@ -567,14 +595,22 @@ export class ProductionController extends Controller {
     if (path === "projects") {
       const scenes = await this.db.query("SELECT * FROM scenes WHERE project_id = ? ORDER BY order_index, id", [row.id]);
       const editors = await this.db.query("SELECT id, name FROM editors WHERE is_active = 1 ORDER BY name LIMIT 200");
+      const sceneStats = summarizeScenes(scenes);
       return this.render("projects", {
         title: row.title,
         message: takeFlash(this.context),
         navigation,
         pageType: "show",
         project: { ...row, posterUrl: mediaUrl(row.poster_image) },
-        rows: scenes.map((scene) => rowForView(scene, "/scenes")),
+        rows: scenes.map((scene) => ({
+          ...rowForView(scene, "/scenes"),
+          order: String(scene.order_index ?? ""),
+          statusKey: sceneStatusKey(scene),
+          duration: scene.duration ? `${scene.duration}s` : ""
+        })),
         hasRows: scenes.length > 0,
+        stats: sceneStats,
+        initial: String(row.title ?? "?").trim().charAt(0).toUpperCase() || "?",
         editHref: `/projects/${row.id}/edit`,
         timelineHref: `/projects/${row.id}/timeline`,
         videoEditorHref: `/projects/${row.id}/videoeditor`,

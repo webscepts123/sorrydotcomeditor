@@ -5,6 +5,9 @@ html lang="en"
     title "{{title}} — Production Hub"
     link rel="stylesheet" href="/public/app.css"
     script src="/public/navigation.js" defer="defer"
+    link rel="stylesheet" href="/public/studio/bootstrap-icons.css"
+    link rel="stylesheet" href="/public/project-show.css?v=1"
+    script src="/public/project-show.js?v=1" defer="defer"
   body
     div.app-shell
       nav.side-nav
@@ -79,52 +82,154 @@ html lang="en"
             button.primary type="submit" "{{submitLabel}}"
           a.nav-link href="/projects" "Cancel"
         if pageType == "show"
-          article.record-card
-            h2 "{{project.title}}"
-            p.muted "{{project.description}}"
-            p.status "{{project.status}}"
-            p "Aspect ratio: {{project.aspect_ratio}}"
-            p "Resolution: {{project.resolution}}"
-            p "Style: {{project.style_preset}}"
-            if project.posterUrl
-              img.project-poster src="{{project.posterUrl}}" alt="Generated project poster"
-            div.action-row
-              a.primary-link href="{{editHref}}" "Edit production"
-              a.nav-link href="{{timelineHref}}" "Open timeline"
-              a.nav-link href="{{videoEditorHref}}" "Open video editor"
-              a.nav-link href="{{editorHref}}" "Open scene editor"
-              a.nav-link href="{{xmlHref}}" "Export scene XML"
-          div.action-row
-            form method="post" action="{{renderAction}}"
-              button.primary type="submit" "Batch render scenes"
-            form method="post" action="{{posterAction}}"
-              button.secondary type="submit" "Generate poster"
-            if downloadHref
-              a.nav-link href="{{downloadHref}}" download="download" "Download completed movie"
-            else
-              p.muted "Completed movie unavailable. Download rendered scene clips from the video editor."
-            form method="post" action="{{deleteAction}}"
-              button.danger type="submit" "Delete production"
-          if hasEditors
-            form.form-card method="post" action="{{editorAssignAction}}"
-              label for="editor_id" "Assign editor"
-              select id="editor_id" name="editor_id"
-                for editor in editors
-                  option value="{{editor.value}}" "{{editor.label}}"
-              label for="assigned_task" "Assignment"
-              input id="assigned_task" type="text" name="assigned_task" value="Production editing"
-              button.secondary type="submit" "Assign editor"
-          div.page-heading
-            h2 "Production scenes"
-            a.primary-link href="{{sceneCreateHref}}" "Add scene"
-          if hasRows
-            for row in rows
-              article.record-card
-                a.record-title href="{{row.href}}" "{{row.title}}"
-                p.muted "{{row.summary}}"
-                span.status "{{row.status}}"
-          else
-            p.muted "No scenes have been added to this production."
+          div.ps-page
+            section.ps-hero
+              div.ps-poster
+                if project.posterUrl
+                  img src="{{project.posterUrl}}" alt="Generated project poster"
+                else
+                  div.ps-poster-empty
+                    span.ps-poster-initial "{{initial}}"
+                    span.ps-poster-hint "No poster yet"
+              div.ps-hero-body
+                div.ps-chips
+                  span.ps-badge "{{project.status}}"
+                  if project.aspect_ratio
+                    span.ps-chip
+                      span.bi.bi-aspect-ratio
+                      span "{{project.aspect_ratio}}"
+                  if project.resolution
+                    span.ps-chip
+                      span.bi.bi-badge-4k
+                      span "{{project.resolution}}"
+                  if project.style_preset
+                    span.ps-chip
+                      span.bi.bi-palette
+                      span "{{project.style_preset}}"
+                if project.description
+                  p.ps-logline "{{project.description}}"
+                div.ps-progress data-progress="{{stats.percent}}"
+                  div.ps-progress-head
+                    span "Render progress"
+                    strong "{{stats.ready}} / {{stats.total}} scenes · {{stats.percent}}%"
+                  div.ps-progress-track role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{stats.percent}}" aria-label="Scenes rendered"
+                    div.ps-progress-fill
+                div.ps-hero-actions
+                  form method="post" action="{{renderAction}}" data-busy-label="Queuing renders…"
+                    button.primary.ps-btn type="submit"
+                      span.bi.bi-play-fill
+                      span "Batch render scenes"
+                  form method="post" action="{{posterAction}}" data-busy-label="Generating…"
+                    button.secondary.ps-btn type="submit"
+                      span.bi.bi-image
+                      span "Generate poster"
+                  a.secondary.ps-btn href="{{editHref}}"
+                    span.bi.bi-pencil
+                    span "Edit production"
+                if downloadHref
+                  a.ps-download href="{{downloadHref}}" download="download"
+                    span.bi.bi-download
+                    span "Download completed movie"
+                else
+                  p.ps-note
+                    span.bi.bi-info-circle
+                    span "Completed movie unavailable. Download rendered scene clips from the video editor."
+
+            div.ps-stats
+              div.ps-stat
+                span.ps-stat-label "Scenes"
+                strong.ps-stat-value "{{stats.total}}"
+              div.ps-stat data-tone="ready"
+                span.ps-stat-label "Rendered"
+                strong.ps-stat-value "{{stats.ready}}"
+              div.ps-stat data-tone="busy"
+                span.ps-stat-label "Rendering"
+                strong.ps-stat-value "{{stats.busy}}"
+              div.ps-stat data-tone="failed"
+                span.ps-stat-label "Failed"
+                strong.ps-stat-value "{{stats.failed}}"
+              div.ps-stat
+                span.ps-stat-label "Runtime"
+                strong.ps-stat-value "{{stats.runtime}}"
+
+            div.ps-layout
+              section.ps-panel.ps-scenes
+                div.ps-panel-head
+                  div
+                    h2 "Production scenes"
+                    p.ps-sub "{{stats.total}} scenes in sequence"
+                  a.primary-link.ps-btn href="{{sceneCreateHref}}"
+                    span.bi.bi-plus-lg
+                    span "Add scene"
+                if hasRows
+                  div.ps-toolbar
+                    label.ps-search
+                      span.bi.bi-search
+                      input type="search" placeholder="Search scenes…  ( / )" aria-label="Search scenes" data-scene-search="data-scene-search"
+                    div.ps-filters role="group" aria-label="Filter scenes by status"
+                      button.ps-filter type="button" data-filter="all" aria-pressed="true" "All"
+                      button.ps-filter type="button" data-filter="ready" aria-pressed="false" "Ready"
+                      button.ps-filter type="button" data-filter="busy" aria-pressed="false" "Rendering"
+                      button.ps-filter type="button" data-filter="pending" aria-pressed="false" "Pending"
+                      button.ps-filter type="button" data-filter="failed" aria-pressed="false" "Failed"
+                  ol.ps-scene-list
+                    for row in rows
+                      li.ps-scene data-status="{{row.statusKey}}"
+                        a.ps-scene-link href="{{row.href}}"
+                          span.ps-scene-index "{{row.order}}"
+                          span.ps-scene-body
+                            span.ps-scene-title "{{row.title}}"
+                            span.ps-scene-summary "{{row.summary}}"
+                          span.ps-scene-meta
+                            if row.duration
+                              span.ps-scene-duration "{{row.duration}}"
+                            span.ps-pill data-status="{{row.statusKey}}" "{{row.status}}"
+                          span.bi.bi-chevron-right.ps-scene-arrow
+                  p.ps-empty data-filter-empty="data-filter-empty" hidden="hidden" "No scenes match this filter."
+                else
+                  div.ps-empty-state
+                    span.bi.bi-film
+                    p "No scenes have been added to this production."
+                    a.primary-link href="{{sceneCreateHref}}" "Add the first scene"
+
+              div.ps-side
+                section.ps-panel
+                  h2.ps-panel-title "Workspace"
+                  div.ps-tools
+                    a.ps-tool href="{{timelineHref}}"
+                      span.bi.bi-bar-chart-steps
+                      span "Timeline"
+                    a.ps-tool href="{{videoEditorHref}}"
+                      span.bi.bi-camera-reels
+                      span "Video editor"
+                    a.ps-tool href="{{editorHref}}"
+                      span.bi.bi-layout-text-window
+                      span "Scene editor"
+                    a.ps-tool href="{{xmlHref}}"
+                      span.bi.bi-filetype-xml
+                      span "Export XML"
+
+                if hasEditors
+                  section.ps-panel
+                    h2.ps-panel-title "Assign editor"
+                    form.ps-form method="post" action="{{editorAssignAction}}" data-busy-label="Assigning…"
+                      label for="editor_id" "Editor"
+                      select id="editor_id" name="editor_id"
+                        for editor in editors
+                          option value="{{editor.value}}" "{{editor.label}}"
+                      label for="assigned_task" "Assignment"
+                      input id="assigned_task" type="text" name="assigned_task" value="Production editing"
+                      button.secondary.ps-btn type="submit"
+                        span.bi.bi-person-plus
+                        span "Assign editor"
+
+                section.ps-panel.ps-danger
+                  h2.ps-panel-title "Danger zone"
+                  p.ps-sub "Deleting removes this production and its scenes permanently."
+                  form method="post" action="{{deleteAction}}" data-confirm="Delete “{{project.title}}” and all of its scenes? This cannot be undone."
+                    button.danger.ps-btn type="submit"
+                      span.bi.bi-trash
+                      span "Delete production"
         if pageType == "workspace"
           div.action-row
             a.primary-link href="{{projectHref}}" "Production overview"
