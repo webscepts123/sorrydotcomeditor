@@ -69,27 +69,33 @@ def run(data):
         raise ValueError("Unknown action")
 
 
-try:
-    payload = json.load(sys.stdin)
-    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-        result = run(payload)
-    print(json.dumps(result))
-except BaseException as error:
-    # Do not return SDK response bodies: they may contain credentials or signed URLs.
-    status = getattr(getattr(error, "response", None), "status_code", None)
-    if isinstance(error, (ImportError, ModuleNotFoundError)) or type(error).__name__ == "PackageNotFoundError":
-        message = "The server Kaggle runtime is not installed. Ask the administrator to configure Kaggle."
-    elif isinstance(error, BridgeError):
-        message = str(error)
-    elif status == 401:
-        message = "Kaggle rejected the API credential. Generate a fresh token and confirm the Kaggle username."
-    elif status == 403:
-        message = "Kaggle denied API access. Check that this credential can access Kaggle Notebooks."
-    elif status == 429:
-        message = "Kaggle is limiting API requests. Wait a few minutes and try again."
-    elif isinstance(status, int) and status >= 500:
-        message = "Kaggle is temporarily unavailable. Try again shortly."
-    else:
-        message = "The studio could not complete the Kaggle API request. Try again shortly."
-    print(json.dumps({"error": message}))
-    sys.exit(1)
+
+def main():
+    try:
+        payload = json.load(sys.stdin)
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            result = run(payload)
+        print(json.dumps(result))
+    except BaseException as error:
+        # Do not return SDK response bodies: they may contain credentials or signed URLs.
+        status = getattr(getattr(error, "response", None), "status_code", None)
+        if isinstance(error, (ImportError, ModuleNotFoundError)) or type(error).__name__ == "PackageNotFoundError":
+            message = "The server Kaggle runtime is not installed. Ask the administrator to configure Kaggle."
+        elif isinstance(error, BridgeError):
+            message = str(error)
+        elif status == 401:
+            message = "Kaggle rejected the API credential. Generate a fresh token and confirm the Kaggle username."
+        elif status == 403:
+            message = "Kaggle denied API access. Check that this credential can access Kaggle Notebooks."
+        elif status == 429:
+            message = "Kaggle is limiting API requests. Wait a few minutes and try again."
+        elif isinstance(status, int) and status >= 500:
+            message = "Kaggle is temporarily unavailable. Try again shortly."
+        else:
+            message = "The studio could not complete the Kaggle API request. Try again shortly."
+        print(json.dumps({"error": message}))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

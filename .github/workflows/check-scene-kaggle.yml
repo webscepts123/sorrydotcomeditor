@@ -25,28 +25,51 @@ jobs:
           export LD_LIBRARY_PATH="$HOME/.local${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           base="$HOME/apps/sorrydotcomeditor"
           for attempt in {1..32}; do
-            if grep -Fq "SDK can return its run log" "$base/current/scripts/kaggle-api.py"; then break; fi
+            if grep -Fq "def main():" "$base/current/scripts/kaggle-api.py"; then break; fi
             sleep 5
           done
           cd "$base/current"
-          grep -Fq "SDK can return its run log" scripts/kaggle-api.py
+          grep -Fq "def main():" scripts/kaggle-api.py
           "$HOME/.local/node/bin/node" --input-type=module <<'NODE'
           import { stat } from 'node:fs/promises';
+          import { spawnSync } from 'node:child_process';
           import { connect, loadEnvironment } from 'noderyx-framework';
-          import { KaggleApiService } from './app/Services/KaggleApiService.js';
+          import { KaggleApiService, runKaggle } from './app/Services/KaggleApiService.js';
           loadEnvironment();
           const { default: config } = await import('./noderyx.config.js');
           const db = await connect(config.database);
+          const diagnose = async (payload, timeout) => {
+            if (payload.action !== "output") return runKaggle(payload, timeout);
+            const python = process.env.KAGGLE_PYTHON || '../../shared/kaggle-venv/bin/python';
+            const code = [
+              "import contextlib, importlib.util, io, json, os, re, sys, traceback",
+              "spec = importlib.util.spec_from_file_location('bridge', 'scripts/kaggle-api.py')",
+              "bridge = importlib.util.module_from_spec(spec)",
+              "spec.loader.exec_module(bridge)",
+              "try:",
+              "    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):",
+              "        result = bridge.run(json.load(sys.stdin))",
+              "    print(json.dumps(result))",
+              "except BaseException as exc:",
+              "    status = getattr(getattr(exc, 'response', None), 'status_code', None)",
+              "    frames = [f'{os.path.basename(item.filename)}-{item.lineno}' for item in traceback.extract_tb(exc.__traceback__)[-5:]]",
+              "    print(json.dumps({'error': ' '.join([type(exc).__name__, str(status), *frames])}))",
+            ].join('\n');
+            const run = spawnSync(python, ['-c', code], { input: JSON.stringify(payload), encoding: 'utf8', timeout });
+            const result = JSON.parse(run.stdout || '{}');
+            if (!result.video) throw new Error(result.error || 'diagnostic subprocess failed');
+            return result;
+          };
           const current = async () => (await db.query('SELECT s.*,p.user_id FROM scenes s JOIN projects p ON p.id=s.project_id WHERE s.id=?',[5]))[0];
           let scene = await current();
           let outcome = 'scene-not-imported';
           if (scene?.generation_job_id?.startsWith('kaggle:') && ['Rendering','Processing'].includes(scene.status)) {
-            const service = new KaggleApiService({ database:db });
+            const service = new KaggleApiService({ database:db, run:diagnose });
             try {
               const result = await service.sync(scene.user_id, scene);
               outcome = result.status === 'Ready' ? 'import-completed' : 'provider-still-pending';
             } catch (error) {
-              outcome = /1080p MP4/.test(error.message) ? 'output-missing-or-ambiguous' : /no longer matches/.test(error.message) ? 'import-race' : /^[A-Z_0-9]{2,32}$/.test(error.code || '') ? error.code : 'import-failed';
+              outcome = /1080p MP4/.test(error.message) ? 'output-missing-or-ambiguous' : /no longer matches/.test(error.message) ? 'import-race' : /^[A-Z_0-9]{2,32}$/.test(error.code || '') ? error.code : /^[\w. -]{1,200}$/.test(error.message) && /(?:Error|Exception)/.test(error.message) ? error.message : 'import-failed';
             }
             scene = await current();
           }
