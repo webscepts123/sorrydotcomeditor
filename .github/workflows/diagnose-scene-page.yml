@@ -37,20 +37,20 @@ jobs:
               code = re.search(r"code: ['\"]([A-Z_0-9]+)['\"]", trace)
               line = re.search(r'(ProductionController\.js|scenes\.noderframe):(\d+)', trace)
               reference = re.search(r'ReferenceError: ([A-Za-z_$][\w$]*) is not defined', trace)
-                        trace = re.split(r'\n\[Noderyx ', trace, maxsplit=1)[0]
-                        stack = re.findall(r'[/\\]([A-Za-z0-9_.-]+\.(?:m?js|noderframe)):(\d+):\d+', trace)
-                        stack = [f"{name}:{number}" for name, number in stack[:5]]
-                        markers = [label for label, pattern in {
-                            "json-parse": r'JSON\.parse|not valid JSON',
-                            "regex": r'Invalid regular expression',
-                            "unexpected-token": r'Unexpected token',
-                            "unexpected-identifier": r'Unexpected identifier',
-                            "unclosed-input": r'Unexpected end',
-                            "invalid-token": r'Invalid or unexpected token',
-                            "module-load": r'compileSourceTextModule|ModuleLoader',
-                            "mysql": r'mysql2|MariaDB|SQL syntax',
-                            "compiler": r'compileFile|renderView|noderframe',
-                        }.items() if re.search(pattern, trace, re.I)]
+              trace = re.split(r'\n\[Noderyx ', trace, maxsplit=1)[0]
+              stack = re.findall(r'[/\\]([A-Za-z0-9_.-]+\.(?:m?js|noderframe)):(\d+):\d+', trace)
+              stack = [f"{name}:{number}" for name, number in stack[:5]]
+              markers = [label for label, pattern in {
+                  "json-parse": r'JSON\.parse|not valid JSON',
+                  "regex": r'Invalid regular expression',
+                  "unexpected-token": r'Unexpected token',
+                  "unexpected-identifier": r'Unexpected identifier',
+                  "unclosed-input": r'Unexpected end',
+                  "invalid-token": r'Invalid or unexpected token',
+                  "module-load": r'compileSourceTextModule|ModuleLoader',
+                  "mysql": r'mysql2|MariaDB|SQL syntax',
+                  "compiler": r'compileFile|renderView|noderframe',
+              }.items() if re.search(pattern, trace, re.I)]
               print(" ".join(value for value in [kind and kind[1], code and code[1], line and line[0], reference and reference[1], *markers, *stack] if value) or "Unclassified scene error")
               break
           else:
