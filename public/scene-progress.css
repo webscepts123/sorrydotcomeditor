@@ -147,3 +147,11 @@
 @media (prefers-reduced-motion: reduce) {
   .render-progress, .render-progress *, .render-progress::before, .render-progress *::before, .render-progress *::after { animation: none !important; transition: none !important; }
 }
+
+.scene-preview-player {
+  display: block;
+  width: 100%;
+  max-height: 65vh;
+  margin-bottom: 8px;
+  background: #000;
+}

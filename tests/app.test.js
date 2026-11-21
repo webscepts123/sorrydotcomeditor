@@ -127,6 +127,7 @@ test("production page templates render their page-specific controls", async () =
   const cases = [
     ["projects.noderframe", { title: "Projects", pageType: "index", createHref: "/projects/create", projects: [], hasRows: false }, /Initialize first project/],
     ["scenes.noderframe", { title: "Scenes", pageType: "index", createHref: "/scenes/create", rows: [], hasRows: false }, /No scenes yet/],
+    ["scenes.noderframe", { title: "Sequence 3", pageType: "show", scene: { order_index: 3 }, videoUrl: "/public/uploads/scenes/clip.mp4" }, /href="\/public\/uploads\/scenes\/clip\.mp4"[^>]*data-scene-video/],
     ["characters.noderframe", { title: "Characters", pageType: "index", createHref: "/characters/create", rows: [], hasRows: false }, /Export character data/],
     ["planning.noderframe", { pageType: "form", projectOptions: [], fields: [], selectedProjectId: "1", logline: "" }, /Generate story with AI/],
     ["posters.noderframe", { projects: [], hasRows: false, createHref: "/projects/create" }, /Movie Poster Studio/],
