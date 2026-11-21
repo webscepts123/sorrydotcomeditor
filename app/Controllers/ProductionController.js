@@ -620,6 +620,7 @@ export class ProductionController extends Controller {
         videoEditorHref: `/projects/${row.project_id}/videoeditor?scene_id=${row.id}`,
         syncAction: `/scenes/${row.id}/sync-render`,
         progressUrl: `/scenes/${row.id}/progress`,
+        cancelRenderAction: `/scenes/${row.id}/cancel-render`,
         linkNotebookAction: `/scenes/${row.id}/link-kaggle-notebook`,
         deleteAction: `/scenes/${row.id}/delete`
       });
@@ -1001,9 +1002,18 @@ export class ProductionController extends Controller {
           if (result?.message) message = result.message;
         } else {
           const service = provider === "local" ? this.service("comfyLocal")() : this.comfy;
-          const videoPath = await service.downloadCompletedVideo(provider === "local" ? jobId.slice(6) : jobId);
-          if (videoPath) await this.models.scenes.update(scene.id, { video_path: videoPath, status: "Ready", generation_error: null });
-          remoteStatus = videoPath ? "complete" : "running";
+          const promptId = provider === "local" ? jobId.slice(6) : jobId;
+          let videoPath = await service.downloadCompletedVideo(promptId);
+          remoteStatus = videoPath ? "complete" : await service.queueState(promptId);
+          // Not finished and not queued: re-check history once in case it just completed.
+          if (remoteStatus === "missing") videoPath = await service.downloadCompletedVideo(promptId);
+          if (videoPath) {
+            await this.models.scenes.update(scene.id, { video_path: videoPath, status: "Ready", generation_error: null });
+            remoteStatus = "complete";
+          } else if (remoteStatus === "missing") {
+            await this.db.query("UPDATE scenes SET status = 'failed', generation_error = ? WHERE id = ? AND generation_job_id = ? AND status IN ('Rendering', 'Processing')",
+              ["ComfyUI no longer has this job (the server was probably restarted). Queue the render again.", scene.id, jobId]);
+          }
         }
       } catch (error) {
         if (error instanceof ComfyRenderFailedError) {
@@ -1018,10 +1028,13 @@ export class ProductionController extends Controller {
     const failed = String(scene.status).toLowerCase() === "failed";
     if (failed) message = scene.generation_error || "Generation failed.";
     const startedAt = scene.updated_at ? new Date(scene.updated_at) : null;
+    const elapsedSeconds = startedAt && !Number.isNaN(startedAt.getTime()) ? (Date.now() - startedAt.getTime()) / 1000 : 0;
     return this.json({
       status: scene.status,
       provider,
       busy: busy(),
+      stalled: busy() && elapsedSeconds > etaSeconds * 4,
+      cancel_url: `/scenes/${scene.id}/cancel-render`,
       ready,
       failed,
       remote_status: remoteStatus,
@@ -1033,6 +1046,17 @@ export class ProductionController extends Controller {
       video_url: mediaUrl(scene.video_path) || scene.video_url || null,
       notebook_url: notebookUrl
     });
+  }
+
+  // Stops tracking a stuck job so the scene can be rendered again. The remote
+  // worker is not contacted; a late result is ignored because the job is failed.
+  async cancelSceneRender() {
+    const scene = await this.findOwned("scenes", this.params.id);
+    await this.db.query("UPDATE scenes SET status = 'failed', generation_error = ? WHERE id = ? AND status IN ('Rendering', 'Processing')", ["Cancelled from the scene page. Queue a new render when ready.", scene.id]);
+    ProductionController.progressChecks?.delete(scene.id);
+    if (!this.wantsHtml) return this.json({ status: "failed", cancelled: true });
+    flash(this.context, "Render cancelled. You can queue it again.");
+    return redirect(this.context, `/scenes/${scene.id}`);
   }
 
   async kaggleScene() {
@@ -1623,6 +1647,7 @@ export function registerProductionRoutes(app) {
   app.post("/scenes/:id/render", ProductionController.handle("renderScene"));
   app.post("/scenes/:id/render-local", ProductionController.handle("renderLocalScene"));
   app.get("/scenes/:id/progress", ProductionController.handle("sceneProgress"));
+  app.post("/scenes/:id/cancel-render", ProductionController.handle("cancelSceneRender"));
   app.post("/scenes/:id/link-kaggle-notebook", ProductionController.handle("linkKaggleNotebook"));
   app.post("/scenes/:id/sync-render", ProductionController.handle("syncSceneRender"));
   app.post("/scenes/:id/attach-video", ProductionController.handle("attachVideo"));

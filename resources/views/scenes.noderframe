@@ -5,7 +5,8 @@ html lang="en"
     title "{{title}} — Production Hub"
     link rel="stylesheet" href="/public/app.css"
     script src="/public/navigation.js" defer="defer"
-    script src="/public/scene-progress.js" defer="defer"
+    link rel="stylesheet" href="/public/scene-progress.css?v=2"
+    script src="/public/scene-progress.js?v=2" defer="defer"
   body
     div.app-shell
       nav.side-nav
@@ -76,9 +77,11 @@ html lang="en"
             span.status "{{scene.status}}"
             p "Project: {{projectTitle}}"
             if renderBusy
-              section.render-progress data-progress-url="{{progressUrl}}" aria-live="polite"
+              section.render-progress.is-queued data-progress-url="{{progressUrl}}" aria-live="polite"
                 div.render-progress-head
-                  strong.render-progress-title "Generating scene"
+                  div.render-progress-heading
+                    span.render-progress-spinner aria-hidden="true"
+                    strong.render-progress-title "Generating scene"
                   span.render-progress-percent "0%"
                 div.render-progress-track role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Scene generation progress" title="Click to check now"
                   div.render-progress-fill
@@ -95,7 +98,9 @@ html lang="en"
                 div.render-progress-actions
                   button.secondary.render-progress-check type="button" "Check now"
                   button.secondary.render-progress-toggle type="button" aria-pressed="false" "Pause auto-refresh"
-                  a.nav-link.render-progress-notebook href="#" target="_blank" rel="noopener" hidden="hidden" "Open Kaggle notebook"
+                  form.render-progress-cancel method="post" action="{{cancelRenderAction}}" hidden="hidden"
+                    button.danger type="submit" "Cancel stuck job"
+                  a.render-progress-notebook href="#" target="_blank" rel="noopener" hidden="hidden" "Open Kaggle notebook ↗"
             if videoUrl
               video controls="controls" src="{{videoUrl}}"
             div.action-row

@@ -1,0 +1,149 @@
+/* Scene generation progress card. Loaded with a ?v= query so browsers fetch
+   new versions despite the long static cache. */
+.render-progress {
+  --rp-accent: #80c4dc;
+  --rp-accent-deep: #2c7da0;
+  --rp-ok: #3fb37f;
+  --rp-warn: #f0ad4e;
+  --rp-bad: #ff6b6b;
+  --rp-muted: #8a939c;
+  --rp-line: #262b31;
+  position: relative;
+  display: grid;
+  gap: 16px;
+  margin: 20px 0;
+  padding: 22px;
+  border: 1px solid var(--rp-line);
+  border-radius: 14px;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(128,196,220,.10), transparent 55%),
+    linear-gradient(180deg, #0f1317, #0a0c0f);
+  box-shadow: 0 10px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
+  overflow: hidden;
+  animation: rp-enter .5s cubic-bezier(.2,.8,.2,1) both;
+}
+.render-progress[hidden], .render-progress [hidden] { display: none !important; }
+.render-progress::before {
+  content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: conic-gradient(from var(--rp-angle, 0deg), transparent 0 70%, var(--rp-accent) 85%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: rp-orbit 4s linear infinite; opacity: .7;
+}
+@property --rp-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+/* Header */
+.render-progress-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.render-progress-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.render-progress-spinner {
+  flex: none; width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid rgba(128,196,220,.2); border-top-color: var(--rp-accent);
+  animation: rp-spin .9s linear infinite;
+}
+.render-progress-title { font-size: 14px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #fff; }
+.render-progress-percent {
+  font-size: 34px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+  background: linear-gradient(90deg, #fff, var(--rp-accent)); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* Bar */
+.render-progress-track {
+  position: relative; height: 14px; border-radius: 999px; cursor: pointer;
+  background: #15191e; box-shadow: inset 0 1px 3px rgba(0,0,0,.6); overflow: hidden;
+  transition: box-shadow .2s;
+}
+.render-progress-track:hover { box-shadow: inset 0 1px 3px rgba(0,0,0,.6), 0 0 0 1px var(--rp-accent); }
+.render-progress-fill {
+  position: relative; height: 100%; width: 0; border-radius: inherit;
+  background:
+    repeating-linear-gradient(-45deg, rgba(255,255,255,.14) 0 10px, transparent 10px 20px),
+    linear-gradient(90deg, var(--rp-accent-deep), var(--rp-accent));
+  background-size: 28px 28px, 100% 100%;
+  box-shadow: 0 0 18px rgba(128,196,220,.55);
+  transition: width 1s cubic-bezier(.2,.8,.2,1);
+  animation: rp-stripes 1s linear infinite;
+}
+.render-progress-fill::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 120px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
+  animation: rp-shine 2.2s ease-in-out infinite;
+}
+.render-progress-fill::before {
+  content: ""; position: absolute; right: -2px; top: 50%; width: 10px; height: 10px; border-radius: 50%;
+  transform: translateY(-50%); background: #fff; box-shadow: 0 0 12px 4px var(--rp-accent);
+  animation: rp-glow 1.4s ease-in-out infinite;
+}
+
+/* Steps timeline */
+.render-progress-steps { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); margin: 4px 0 0; padding: 0; list-style: none; counter-reset: rp; }
+.render-progress-steps::before, .render-progress-steps::after {
+  content: ""; position: absolute; top: 13px; left: 12.5%; height: 2px; background: var(--rp-line);
+}
+.render-progress-steps::before { right: 12.5%; }
+.render-progress-steps::after { width: calc(var(--rp-steps, 0) * 25%); background: linear-gradient(90deg, var(--rp-accent-deep), var(--rp-accent)); transition: width .8s cubic-bezier(.2,.8,.2,1); }
+.render-progress-steps li { position: relative; z-index: 1; display: grid; justify-items: center; gap: 8px; color: var(--rp-muted); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; text-align: center; transition: color .4s; }
+.render-progress-steps li::before {
+  counter-increment: rp; content: counter(rp);
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid var(--rp-line); background: #0d1013; color: var(--rp-muted); font-size: 12px; letter-spacing: 0;
+  transition: all .4s cubic-bezier(.2,.8,.2,1);
+}
+.render-progress-steps li.done { color: var(--rp-accent); }
+.render-progress-steps li.done::before { content: "✓"; border-color: var(--rp-accent); background: var(--rp-accent); color: #061015; font-weight: 700; animation: rp-pop .45s cubic-bezier(.2,1.6,.4,1); }
+.render-progress-steps li.active { color: #fff; }
+.render-progress-steps li.active::before { border-color: var(--rp-accent); color: #fff; background: #10252e; animation: rp-ring 1.6s ease-out infinite; }
+
+/* Meta + message */
+.render-progress-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.render-progress-meta span:not(:empty) {
+  padding: 5px 10px; border: 1px solid var(--rp-line); border-radius: 999px; background: rgba(255,255,255,.02);
+  color: #c3cad1; font-size: 12px; font-variant-numeric: tabular-nums;
+}
+.render-progress-message { margin: 0; color: var(--rp-muted); font-size: 14px; }
+.render-progress-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.render-progress-actions form { margin: 0; }
+.render-progress-actions .secondary, .render-progress-actions .danger { border-radius: 8px; transition: transform .15s, background .2s, color .2s; }
+.render-progress-actions .secondary:active, .render-progress-actions .danger:active { transform: scale(.97); }
+.render-progress-actions button:disabled { opacity: .55; cursor: progress; }
+.render-progress-notebook { padding: 10px 12px; color: var(--rp-accent) !important; }
+.render-progress.is-checking .render-progress-check::after {
+  content: ""; display: inline-block; width: 10px; height: 10px; margin-left: 8px; vertical-align: -1px; border-radius: 50%;
+  border: 2px solid currentColor; border-right-color: transparent; animation: rp-spin .7s linear infinite;
+}
+.render-progress.is-checking .render-progress-track { box-shadow: inset 0 1px 3px rgba(0,0,0,.6), 0 0 0 1px rgba(128,196,220,.6); }
+
+/* States */
+.render-progress.is-queued .render-progress-fill { animation: rp-stripes 1s linear infinite, rp-breathe 1.6s ease-in-out infinite; }
+.render-progress.is-paused::before, .render-progress.is-paused .render-progress-fill, .render-progress.is-paused .render-progress-fill::after,
+.render-progress.is-paused .render-progress-spinner, .render-progress.is-paused .render-progress-steps li.active::before { animation-play-state: paused; }
+.render-progress.is-stalled { --rp-accent: var(--rp-warn); --rp-accent-deep: #b7791f; }
+.render-progress.is-stalled .render-progress-message { color: var(--rp-warn); }
+.render-progress.is-ready { --rp-accent: var(--rp-ok); --rp-accent-deep: #23845a; animation: rp-celebrate .9s ease-out; }
+.render-progress.is-ready .render-progress-spinner { border-color: var(--rp-ok); animation: rp-pop .45s; }
+.render-progress.is-ready .render-progress-fill, .render-progress.is-ready .render-progress-fill::after, .render-progress.is-ready .render-progress-fill::before { animation: none; }
+.render-progress.is-failed { --rp-accent: var(--rp-bad); --rp-accent-deep: #a83232; animation: rp-shake .45s; }
+.render-progress.is-failed::before, .render-progress.is-failed .render-progress-spinner { display: none; }
+.render-progress.is-failed .render-progress-fill, .render-progress.is-failed .render-progress-fill::after { animation: none; }
+.render-progress.is-failed .render-progress-fill::before { display: none; }
+.render-progress.is-failed .render-progress-message { color: var(--rp-bad); }
+
+@keyframes rp-enter { from { opacity: 0; transform: translateY(10px) scale(.99); } }
+@keyframes rp-orbit { to { --rp-angle: 360deg; } }
+@keyframes rp-spin { to { transform: rotate(360deg); } }
+@keyframes rp-stripes { to { background-position: 28px 0, 0 0; } }
+@keyframes rp-shine { from { left: -120px; } to { left: 100%; } }
+@keyframes rp-glow { 50% { box-shadow: 0 0 20px 7px var(--rp-accent); } }
+@keyframes rp-breathe { 50% { opacity: .55; } }
+@keyframes rp-pop { 0% { transform: scale(.4); } 100% { transform: scale(1); } }
+@keyframes rp-ring { 0% { box-shadow: 0 0 0 0 rgba(128,196,220,.55); } 100% { box-shadow: 0 0 0 12px rgba(128,196,220,0); } }
+@keyframes rp-celebrate { 30% { box-shadow: 0 0 0 4px rgba(63,179,127,.35), 0 0 60px rgba(63,179,127,.35); } }
+@keyframes rp-shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+
+@media (max-width: 640px) {
+  .render-progress { padding: 16px; }
+  .render-progress-percent { font-size: 26px; }
+  .render-progress-steps li { font-size: 9px; letter-spacing: .08em; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .render-progress, .render-progress *, .render-progress::before, .render-progress *::before, .render-progress *::after { animation: none !important; transition: none !important; }
+}

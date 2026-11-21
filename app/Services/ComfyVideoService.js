@@ -102,6 +102,17 @@ export class ComfyVideoService {
     return null;
   }
 
+  // "queued" | "running" | "missing": whether ComfyUI still knows a job that has
+  // no history entry yet. A restarted ComfyUI forgets queued jobs.
+  async queueState(promptId) {
+    const response = await fetch(`${this.baseUrl}/queue`, { signal: AbortSignal.timeout(8000) });
+    const queue = await responseJson(response, "ComfyUI queue request failed.");
+    const has = (items) => Array.isArray(items) && items.some((item) => Array.isArray(item) && item[1] === promptId);
+    if (has(queue?.queue_running)) return "running";
+    if (has(queue?.queue_pending)) return "queued";
+    return "missing";
+  }
+
   async status() {
     const systemResponse = await fetch(`${this.baseUrl}/system_stats`, { signal: AbortSignal.timeout(8000) });
     const system = await responseJson(systemResponse, "ComfyUI system status request failed.");
