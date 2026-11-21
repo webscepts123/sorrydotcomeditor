@@ -1,3 +1,5 @@
+@import url("/public/studio/bootstrap-icons.css");
+@import url("/public/project-show.css?v=2");
 :root {
   color-scheme: dark;
   font-family: Inter, "Segoe UI", sans-serif;

@@ -3,8 +3,9 @@ html lang="en"
     meta charset="utf-8"
     meta name="viewport" content="width=device-width, initial-scale=1"
     title "{{title}}"
-    link rel="stylesheet" href="/public/app.css"
+    link rel="stylesheet" href="/public/app.css?v=2"
     script src="/public/navigation.js" defer="defer"
+    script src="/public/project-show.js?v=2" defer="defer"
     script src="/public/dashboard.js" defer="defer"
   body
     div.app-shell

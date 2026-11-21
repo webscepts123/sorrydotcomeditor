@@ -3,7 +3,7 @@ html lang="en"
     meta charset="utf-8"
     meta name="viewport" content="width=device-width, initial-scale=1"
     title "Sign in — sorrydotcomeditor"
-    link rel="stylesheet" href="/public/app.css"
+    link rel="stylesheet" href="/public/app.css?v=2"
   body
     main.auth-shell
       p.studio-logo "VOID"

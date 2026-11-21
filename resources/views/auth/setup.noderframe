@@ -3,7 +3,7 @@ html lang="en"
     meta charset="utf-8"
     meta name="viewport" content="width=device-width, initial-scale=1"
     title "Initial setup — sorrydotcomeditor"
-    link rel="stylesheet" href="/public/app.css"
+    link rel="stylesheet" href="/public/app.css?v=2"
   body
     main.auth-card
       p.eyebrow "FIRST RUN"

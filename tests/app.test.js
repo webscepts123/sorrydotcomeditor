@@ -23,6 +23,10 @@ test("original editors handle empty productions and escape cast and prompt text"
   assert.match(populated, /&lt;\/textarea&gt;&lt;script&gt;/);
   assert.match(populated, /name="return_to_editor" value="1"/);
   assert.doesNotMatch(populated, /@csrf|@method|\{\{|\sonclick=|\sonsubmit=/);
+  // The Noderyx router swaps only <main> between pages that both have one,
+  // which would drop the editor's own stylesheets; the editor must fully load.
+  assert.doesNotMatch(populated, /<main[\s>]/);
+  assert.match(populated, /href="\/public\/studio\/editor\.css/);
   const studio = renderStudio({ project, scenes: [] });
   assert.match(studio, /Select a clip in the timeline/);
   assert.doesNotMatch(studio, /id="mainPlayer"/);

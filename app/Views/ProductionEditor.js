@@ -220,7 +220,7 @@ export function renderProductionEditor({ project, scenes, characters = [], curre
     </section>
   </aside>
 
-  <main class="ed-main">
+  <div class="ed-main" role="main">
     <div class="ed-main-head">
       <h2>Production timeline <span>(${escapeHtml(scenes.length)} Segments)</span></h2>
       ${scenes.length ? `<div class="ed-main-tools">
@@ -235,7 +235,7 @@ export function renderProductionEditor({ project, scenes, characters = [], curre
       </div>` : ""}
     </div>
     ${body}
-  </main>
+  </div>
 
   <aside class="ed-side ed-side-right">
     <section class="ed-card">
