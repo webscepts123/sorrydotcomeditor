@@ -107,6 +107,12 @@ html lang="en"
                 a.nav-link href="{{videoUrl}}" data-scene-video="true" "Open rendered clip"
             div.action-row
               a.primary-link href="{{editHref}}" "Edit sequence"
+              if videoUrl
+                if renderBusy
+                  button.secondary type="button" disabled="disabled" "Recreate video on Kaggle"
+                else
+                  form method="post" action="{{recreateAction}}"
+                    button.primary type="submit" "Recreate video on Kaggle"
               if renderBusy
                 p.muted "A generation job is already running."
               else if comfyConfigured

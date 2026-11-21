@@ -1,5 +1,5 @@
 import { Controller } from "noderyx-framework";
-import { randomUUID } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { mkdir, readFile, stat, statfs, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { repositories } from "../Models/index.js";
@@ -659,6 +659,7 @@ export class ProductionController extends Controller {
         syncAction: `/scenes/${row.id}/sync-render`,
         progressUrl: `/scenes/${row.id}/progress`,
         cancelRenderAction: `/scenes/${row.id}/cancel-render`,
+        recreateAction: `/scenes/${row.id}/render-kaggle`,
         linkNotebookAction: `/scenes/${row.id}/link-kaggle-notebook`,
         deleteAction: `/scenes/${row.id}/delete`
       });
@@ -990,14 +991,25 @@ export class ProductionController extends Controller {
 
   async renderKaggleScene() {
     const scene = await this.findOwned("scenes", this.params.id);
-    if (["Rendering", "Processing"].includes(scene.status)) return this.json({ message: "This scene already has a running generation job." }, 409);
-    const prompt = typeof this.body?.prompt === "string" ? this.body.prompt.trim() : "";
-    if (!prompt || prompt.length > 8000) return this.json({ message: "Enter a video prompt between 1 and 8000 characters." }, 422);
-    await this.models.scenes.update(scene.id, { prompt });
-    const notebook = await this.kaggleNotebookDocument();
-    if (!notebook) return;
-    try { return this.json(await this.service("kaggle").submit(this.context.session.userId, scene, notebook.body), 202); }
-    catch (error) { return this.json({ message: error.message }, 503); }
+    const html = this.wantsHtml;
+    const respond = (message, status) => {
+      if (!html) return this.json({ message }, status);
+      flash(this.context, message);
+      return redirect(this.context, `/scenes/${scene.id}`);
+    };
+    if (["Rendering", "Processing"].includes(scene.status)) return respond("This scene already has a running generation job.", 409);
+    const submittedPrompt = html ? scene.prompt || scene.script_segment : this.body?.prompt;
+    const prompt = typeof submittedPrompt === "string" ? submittedPrompt.trim() : "";
+    if (!prompt || prompt.length > 8000) return respond("Enter a video prompt between 1 and 8000 characters.", 422);
+    if (!html) await this.models.scenes.update(scene.id, { prompt });
+    try {
+      const notebook = await this.kaggleNotebookDocument(html ? { seed: randomInt(2 ** 32) } : {});
+      if (!notebook) return;
+      const job = await this.service("kaggle").submit(this.context.session.userId, scene, notebook.body);
+      return html ? respond("Video recreation queued on Kaggle. The current clip stays available until the new clip is ready.", 202) : this.json(job, 202);
+    } catch (error) {
+      return respond(error.message, 503);
+    }
   }
 
   async linkKaggleNotebook() {
@@ -1148,9 +1160,10 @@ export class ProductionController extends Controller {
     return this.text(notebook, 200, "application/x-ipynb+json; charset=utf-8");
   }
 
-  async kaggleNotebookDocument() {
+  async kaggleNotebookDocument({ seed } = {}) {
     const job = await this.kaggleJob();
     if (!job) return;
+    if (seed !== undefined) job.seed = seed;
     const notebook = JSON.parse(await readFile(new URL("../../notebooks/cogvideox-kaggle.ipynb", import.meta.url), "utf8"));
     const cell = notebook.cells.find(cell => cell.cell_type === "code" && cell.source.join("").includes("if JOB_FILE:"));
     if (!cell) throw new Error("Notebook scene settings cell is missing.");

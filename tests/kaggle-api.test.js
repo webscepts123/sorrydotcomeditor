@@ -125,3 +125,31 @@ test("Kaggle progress and submission refuse scenes outside the signed-in account
   await assert.rejects(() => controller.renderKaggleScene(), /404/);
   await assert.rejects(() => controller.kaggleSceneProgress(), /404/);
 });
+
+test("recreating a clip uses the saved scene and queues a new seed without clearing the clip", async () => {
+  const scene = { id: 5, status: "Ready", prompt: "Police arrive at a house in Colombo.", video_path: "uploads/scenes/old.mp4" };
+  const headers = {};
+  const session = { userId: 2 };
+  const controller = new ProductionController({
+    params: { id: "5" }, session, request: { headers: { accept: "text/html" } },
+    response: { setHeader: (name, value) => { headers[name] = value; } },
+    text: (_body, status) => ({ status }),
+    service: name => {
+      assert.equal(name, "kaggle");
+      return { submit: async (owner, selected, notebook) => {
+        assert.equal(owner, 2);
+        assert.equal(selected, scene);
+        assert.equal(notebook, "saved scene notebook");
+      } };
+    }
+  });
+  controller.findOwned = async () => scene;
+  controller.kaggleNotebookDocument = async ({ seed }) => {
+    assert.ok(Number.isInteger(seed) && seed >= 0 && seed < 2 ** 32);
+    return { body: "saved scene notebook" };
+  };
+  assert.equal((await controller.renderKaggleScene()).status, 303);
+  assert.equal(headers.Location, "/scenes/5");
+  assert.match(session.flash, /Video recreation queued on Kaggle/);
+  assert.equal(scene.video_path, "uploads/scenes/old.mp4");
+});
