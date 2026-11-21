@@ -142,6 +142,10 @@ settings = PRESETS[PRESET].copy()
 UPSCALE_1080P = PRESET == "1080p"
 FPS = 8
 opening_frames = 25 if OPENING_PROMPT.strip() else 0
+use_fetch_groups = vram_gb < 20
+opening_steps = 18 if use_fetch_groups else 25
+if use_fetch_groups and opening_frames:
+    settings["num_inference_steps"] = min(settings["num_inference_steps"], 36)
 expected_frames = settings["num_frames"] + opening_frames
 print(f"Scene: {SCENE_ID}; preset: {PRESET}; clip length: {expected_frames / FPS:.2f} seconds; seed: {SEED}")
 print(PROMPT)
@@ -149,7 +153,7 @@ print(PROMPT)
 markdown('''
 ## Load the video model and generate
 
-CogVideoX-5B uses BF16 on GPUs with native BF16 support (Ampere or newer) and FP16 otherwise (T4, P100). With less than 20 GiB VRAM the pipeline uses sequential CPU offloading, which fits a 16 GB GPU but is slow; larger GPUs use whole-model offloading. VAE slicing and tiling reduce decode memory. If an out-of-memory error occurs, restart the notebook session and try the `quick` preset. Do not assume a failed session produced a video.
+CogVideoX-5B uses BF16 on GPUs with native BF16 support and FP16 otherwise. On a 16 GB GPU, the transformer prefetches one block at a time and two-shot renders use fewer denoising steps. Larger GPUs use whole-model offloading. VAE slicing and tiling reduce decode memory.
 ''')
 code('''
 import base64
@@ -160,6 +164,7 @@ import time
 from urllib.request import urlopen
 import numpy as np
 from PIL import Image, ImageOps
+from accelerate import cpu_offload
 from diffusers import CogVideoXPipeline, CogVideoXImageToVideoPipeline, CogVideoXDPMScheduler
 from diffusers.utils import export_to_video
 
@@ -175,10 +180,17 @@ def report_progress(stage, step=0, total=0):
 def load_pipeline(pipeline, model, cache):
     loaded = pipeline.from_pretrained(model, cache_dir=cache, torch_dtype=dtype, low_cpu_mem_usage=True)
     loaded.scheduler = CogVideoXDPMScheduler.from_config(loaded.scheduler.config, timestep_spacing="trailing")
-    if vram_gb >= 20:
+    if not use_fetch_groups:
         loaded.enable_model_cpu_offload(gpu_id=0)
     else:
-        loaded.enable_sequential_cpu_offload(gpu_id=0)
+        device = torch.device("cuda:0")
+        loaded.transformer.enable_group_offload(
+            onload_device=device, offload_device=torch.device("cpu"),
+            offload_type="block_level", num_blocks_per_group=1,
+            use_stream=True, low_cpu_mem_usage=True,
+        )
+        for component in (loaded.text_encoder, loaded.vae):
+            cpu_offload(component, execution_device=device, offload_buffers=bool(component._parameters))
     loaded.vae.enable_slicing()
     loaded.vae.enable_tiling()
     print(f"Loaded {model} in {dtype}.")
@@ -234,7 +246,7 @@ try:
         report_progress("loading_opening" if opening_frames else "loading_main")
         pipe = load_pipeline(CogVideoXPipeline, MODEL_ID, opening_cache)
     if opening_frames:
-        opening_settings = {**settings, "num_frames": opening_frames, "num_inference_steps": 25}
+        opening_settings = {**settings, "num_frames": opening_frames, "num_inference_steps": opening_steps}
         clips.append(render_shot(pipe, OPENING_PROMPT, SEED ^ 0x9E3779B9, opening_settings, "opening"))
     if has_reference:
         if opening_frames:
@@ -298,7 +310,7 @@ manifest = {
     "format": "sorrydotcomeditor.wan-kaggle-result.v1",
     "scene_id": SCENE_ID, "model": main_model, "preset": PRESET,
     "prompt": PROMPT, "negative_prompt": NEGATIVE_PROMPT, "seed": SEED,
-    "opening_prompt": OPENING_PROMPT, "opening_frames": opening_frames, "reference_used": has_reference,
+    "opening_prompt": OPENING_PROMPT, "opening_frames": opening_frames, "opening_steps": opening_steps if opening_frames else 0, "reference_used": has_reference,
     "fps": FPS, **settings, "num_frames": expected_frames, "gpu": gpu.name, "created_at": stamp,
     "video_file": video_path.name,
     "source_file": source_path.name,
