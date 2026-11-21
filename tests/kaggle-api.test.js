@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, readFile, writeFile, rm, readdir } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, writeFile, rm, readdir, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { KaggleApiService } from "../app/Services/KaggleApiService.js";
@@ -114,10 +114,15 @@ test("Kaggle completed output attaches only to its matching scene job", async t 
     if (data.action === "output") {
       const video = path.join(data.directory, "scene-9-1080p.mp4");
       await writeFile(video, Buffer.from("000000186674797069736f6d", "hex"));
-      return { video };
+      return { video: await realpath(video) };
     }
     return {};
   }, database);
+  const shared = path.join(service.root, "shared");
+  const releaseStorage = path.join(service.root, "release-storage");
+  await mkdir(shared);
+  await symlink(shared, releaseStorage, "junction");
+  service.root = releaseStorage;
   await service.connect(2, { username: "filmmaker", secret: "private-token" });
   const scene = { id: 9, generation_job_id: jobId };
   assert.equal((await service.sync(2, scene)).pending, true);

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile, unlink, rm, rename } from "node:fs/promises";
+import { mkdir, readFile, realpath, writeFile, unlink, rm, rename } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { importKaggleVideo } from "./KaggleVideoImport.js";
@@ -157,8 +157,12 @@ export class KaggleApiService {
       await mkdir(directory, { recursive: true, mode: 0o700 });
       try {
         const { video } = await this.run({ action: "output", credentials, kernel, directory }, 10 * 60 * 1000);
-        const source = path.resolve(video);
-        if (!source.startsWith(path.resolve(directory) + path.sep)) throw new Error("Invalid Kaggle output path.");
+        const outputRoot = await realpath(directory);
+        const source = await realpath(video);
+        const relative = path.relative(outputRoot, source);
+        if (!relative || relative === ".." || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+          throw new Error("Invalid Kaggle output path.");
+        }
         const imported = await importKaggleVideo(this.database, { sceneId: Number(scene.id), source, publicRoot: this.publicRoot, expectedJobId: jobId });
         return { ...imported, status: "Ready" };
       } finally { await rm(directory, { recursive: true, force: true }); }
