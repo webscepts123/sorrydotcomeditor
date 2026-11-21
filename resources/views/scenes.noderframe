@@ -7,7 +7,7 @@ html lang="en"
     script src="/public/navigation.js" defer="defer"
     script src="/public/project-show.js?v=2" defer="defer"
     link rel="stylesheet" href="/public/scene-progress.css?v=6"
-    script src="/public/scene-progress.js?v=7" defer="defer"
+    script src="/public/scene-progress.js?v=8" defer="defer"
   body
     div.app-shell
       nav.side-nav
@@ -120,7 +120,7 @@ html lang="en"
                 else
                   a.primary-link href="#scene-kaggle-account" "Connect Kaggle to recreate"
               if renderBusy
-                p.muted "A generation job is already running."
+                p.muted "A generation job is already submitted."
               else if comfyConfigured
                 form method="post" action="{{renderAction}}"
                   button.primary type="submit" "Queue ComfyUI render"

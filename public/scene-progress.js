@@ -78,10 +78,10 @@
     const showPercent = !state.failed && state.busy && detail?.total > 0 && stage !== "downloading" && stage !== "ready";
     const percent = showPercent ? Math.floor(100 * detail.step / detail.total) : null;
     percentLabel.textContent = percent === null
-      ? state.failed ? "Failed" : stageLabels[stage] || "Checking"
+      ? state.failed ? "Failed" : stage === "queued" && state.provider === "kaggle" ? "Waiting for GPU" : stageLabels[stage] || "Checking"
       : `${percent}% sampled`;
     track.setAttribute("aria-valuetext", stageLabels[stage] || percentLabel.textContent);
-    fill.style.width = current < 0 ? "0" : ((current + 1) * 25) + "%";
+    fill.style.width = current <= 0 ? "0" : (current * 100 / 3) + "%";
     const seconds = elapsed();
     elapsedLabel.textContent = "Elapsed " + format(seconds);
     const delayed = state.busy && !state.failed && !state.ready
@@ -125,7 +125,9 @@
       }
     }
     messageLabel.textContent = data.message || ({
-      queued: "Waiting for the provider to start the render.",
+      queued: data.provider === "kaggle"
+        ? "Kaggle accepted this notebook and is waiting to assign a GPU. Sampling starts after a worker is assigned."
+        : "Waiting for the provider to start the render.",
       running: "The provider is generating the video.",
       downloading: "The provider finished. The studio is importing the clip.",
       ready: "Video imported. Reloading?"

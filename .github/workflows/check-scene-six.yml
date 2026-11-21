@@ -1,0 +1,72 @@
+﻿name: Check Scene 6 Kaggle allocation
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/check-scene-six.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check Scene 6 using its saved connection
+        id: result
+        env:
+          CPANEL_KEY: ${{ secrets.CPANEL_KEY }}
+          CPANEL_KNOWN_HOSTS: ${{ secrets.CPANEL_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$CPANEL_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$CPANEL_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          result="$(ssh -o BatchMode=yes -o StrictHostKeyChecking=yes studiosorrydotco@studio.sorrydotcom.lk 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          export LD_LIBRARY_PATH="$HOME/.local${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          cd ~/apps/sorrydotcomeditor/current
+          "$HOME/.local/node/bin/node" --input-type=module <<'NODE'
+          import { stat } from 'node:fs/promises';
+          import { connect, loadEnvironment } from 'noderyx-framework';
+          import { KaggleApiService } from './app/Services/KaggleApiService.js';
+          loadEnvironment();
+          const { default: config } = await import('./noderyx.config.js');
+          const db = await connect(config.database);
+          const service = new KaggleApiService({ database:db });
+          const rows = () => db.query('SELECT s.id,s.status,s.generation_job_id,s.video_path,p.user_id FROM scenes s JOIN projects p ON p.id=s.project_id WHERE s.id IN (5,6)');
+          const readStatus = async (scene, credentials) => {
+            if (!scene) return 'scene-not-found';
+            if (scene.status === 'Ready' && /^uploads\/scenes\/kaggle-[56]-[\w-]+\.mp4$/.test(scene.video_path || '')) {
+              const file = await stat('public/' + scene.video_path).catch(() => null);
+              if (file?.size > 0) return 'ready-mp4-verified';
+            }
+            if (!scene.generation_job_id?.startsWith('kaggle:')) return 'no-tracked-kaggle-job';
+            const kernel = scene.generation_job_id.slice(7);
+            if (!credentials || kernel.split('/')[0] !== credentials.username) return 'saved-connection-mismatch';
+            try {
+              const { status } = await service.run({ action:'status', credentials, kernel },25000);
+              return /^[a-z0-9_]{1,32}$/i.test(status || '') ? status : 'unknown';
+            } catch { return 'provider-check-unavailable'; }
+          };
+          let scenes = await rows();
+          let scene = scenes.find(row => Number(row.id) === 6);
+          const credentials = scene ? await service.credentials(scene.user_id).catch(() => null) : null;
+          let outcome;
+          for(let i=0;i<5;i++) {
+            outcome = await readStatus(scene,credentials);
+            if (!['queued','pending'].includes(outcome) || i === 4) break;
+            await new Promise(resolve => setTimeout(resolve,15000));
+            scenes = await rows();
+            scene = scenes.find(row => Number(row.id) === 6);
+          }
+          const other = scenes.find(row => Number(row.id) === 5 && Number(row.user_id) === Number(scene?.user_id));
+          const sibling = await readStatus(other, credentials);
+          console.log('Scene 6 ' + outcome + ' - saved connection ' + (credentials ? 'present' : 'missing') + ' - Scene 5 ' + sibling);
+          process.exit(0);
+          NODE
+          REMOTE
+          )"
+          printf 'summary=%s\n' "$result" >> "$GITHUB_OUTPUT"
+      - name: "${{ steps.result.outputs.summary }}"
+        run: echo 'Only provider statuses are reported.'
+
