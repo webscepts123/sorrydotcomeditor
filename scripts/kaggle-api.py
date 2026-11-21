@@ -9,20 +9,21 @@ import tempfile
 
 
 def run(data):
-    if data["action"] == "probe":
-        from importlib.metadata import version
-        return {"version": version("kaggle")}
-    credentials = data["credentials"]
+    action = data["action"]
     for key in ("KAGGLE_API_TOKEN", "KAGGLE_USERNAME", "KAGGLE_KEY"):
         os.environ.pop(key, None)
-    os.environ["KAGGLE_USERNAME"] = credentials["username"]
-    os.environ["KAGGLE_API_TOKEN" if credentials["kind"] == "token" else "KAGGLE_KEY"] = credentials["secret"]
+    if action != "probe":
+        credentials = data["credentials"]
+        os.environ["KAGGLE_USERNAME"] = credentials["username"]
+        os.environ["KAGGLE_API_TOKEN" if credentials["kind"] == "token" else "KAGGLE_KEY"] = credentials["secret"]
     with tempfile.TemporaryDirectory(prefix="studio-kaggle-auth-") as config:
         os.environ["KAGGLE_CONFIG_DIR"] = config
         from kaggle.api.kaggle_api_extended import KaggleApi
+        if action == "probe":
+            from importlib.metadata import version
+            return {"version": version("kaggle")}
         api = KaggleApi()
         api.authenticate()
-        action = data["action"]
         if action == "verify":
             api.kernels_list(mine=True, page_size=1)
             return {"connected": True}

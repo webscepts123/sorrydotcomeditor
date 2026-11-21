@@ -20,6 +20,7 @@ jobs:
           printf '%s\n' "$CPANEL_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$CPANEL_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          for attempt in {1..18}; do
           result="$(ssh -o BatchMode=yes -o StrictHostKeyChecking=yes studiosorrydotco@studio.sorrydotcom.lk 'bash -s' <<'REMOTE'
           set -euo pipefail
           export LD_LIBRARY_PATH="$HOME/.local${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -54,7 +55,11 @@ jobs:
           NODE
           REMOTE
           )"
+            if [[ "$result" == *import-ready ]]; then break; fi
+            sleep 8
+          done
           printf 'result=%s\n' "$result" >> "$GITHUB_OUTPUT"
+          [[ "$result" == *import-ready ]]
       - name: "SDK import — ${{ steps.probe.outputs.result }}"
         run: echo 'Only module names and source locations are reported.'
 
