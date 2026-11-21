@@ -82,8 +82,18 @@
       : `${percent}% sampled`;
     track.setAttribute("aria-valuetext", stageLabels[stage] || percentLabel.textContent);
     fill.style.width = current < 0 ? "0" : ((current + 1) * 25) + "%";
-    elapsedLabel.textContent = "Elapsed " + format(elapsed());
-    etaLabel.textContent = state.stalled && !state.failed ? "Taking longer than usual" : "";
+    const seconds = elapsed();
+    elapsedLabel.textContent = "Elapsed " + format(seconds);
+    const delayed = state.busy && !state.failed && !state.ready
+      && (state.stalled || (state.eta_seconds > 0 && seconds >= state.eta_seconds));
+    let delayText = "";
+    if (delayed) {
+      const lastStage = stage === "queued" ? "Waiting in the render queue"
+        : stage === "downloading" ? "Importing the finished video"
+        : detailLabels[detail?.stage] || (stage === "running" ? "Generating video" : "Waiting for provider status");
+      delayText = `Taking longer than usual · ${lastStage}`;
+    }
+    if (etaLabel.textContent !== delayText) etaLabel.textContent = delayText;
     panel.classList.toggle("is-queued", stage === "queued");
     stepList.style.setProperty("--rp-steps", String(stage === "ready" ? 3 : Math.max(0, current)));
     steps.forEach((step, index) => {

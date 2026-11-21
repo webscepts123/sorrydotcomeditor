@@ -99,6 +99,11 @@
   padding: 5px 10px; border: 1px solid var(--rp-line); border-radius: 999px; background: rgba(255,255,255,.02);
   color: #c3cad1; font-size: 12px; font-variant-numeric: tabular-nums;
 }
+.render-progress-meta .render-progress-eta:not(:empty) {
+  color: var(--rp-warn);
+  border-color: rgba(244, 185, 93, .45);
+  background: rgba(244, 185, 93, .09);
+}
 .render-progress-message { margin: 0; color: var(--rp-muted); font-size: 14px; }
 .render-progress-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .render-progress-actions form { margin: 0; }
