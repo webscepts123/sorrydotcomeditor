@@ -66,12 +66,15 @@ code('''
 import subprocess
 import sys
 
+render_dependencies = Path("/tmp/void-studio-render-dependencies")
 subprocess.check_call([
-    sys.executable, "-m", "pip", "install", "--quiet",
+    sys.executable, "-m", "pip", "install", "--quiet", "--no-deps",
+    "--target", str(render_dependencies),
     "diffusers==0.35.2", "transformers==4.51.3", "accelerate==1.7.0",
-    "huggingface-hub>=0.34,<1", "safetensors>=0.4.3,<1",
-    "sentencepiece", "ftfy", "imageio", "imageio-ffmpeg", "psutil"
+    "huggingface-hub==0.36.2", "tokenizers>=0.21,<0.22", "safetensors>=0.4.3,<1",
+    "Pillow>=10,<13", "sentencepiece", "ftfy", "imageio", "imageio-ffmpeg", "importlib-metadata", "zipp"
 ])
+sys.path.insert(0, str(render_dependencies))
 print("Libraries installed. Continue to scene settings.")
 ''')
 markdown('''
@@ -165,6 +168,10 @@ if "pipe" in globals():
 gc.collect()
 torch.cuda.empty_cache()
 dtype = torch.bfloat16 if torch.cuda.get_device_capability(0)[0] >= 8 else torch.float16
+
+def report_progress(stage, step=0, total=0):
+    print("STUDIO_PROGRESS " + json.dumps({"stage": stage, "step": step, "total": total}), flush=True)
+
 def load_pipeline(pipeline, model, cache):
     loaded = pipeline.from_pretrained(model, cache_dir=cache, torch_dtype=dtype, low_cpu_mem_usage=True)
     loaded.scheduler = CogVideoXDPMScheduler.from_config(loaded.scheduler.config, timestep_spacing="trailing")
@@ -177,8 +184,17 @@ def load_pipeline(pipeline, model, cache):
     print(f"Loaded {model} in {dtype}.")
     return loaded
 
-def render_shot(pipeline, prompt, seed, shot_settings, **conditioning):
+def render_shot(pipeline, prompt, seed, shot_settings, stage, **conditioning):
     started = time.monotonic()
+    total = shot_settings["num_inference_steps"]
+    report_progress(stage, 0, total)
+
+    def on_step(_pipeline, index, _timestep, callback_kwargs):
+        step = index + 1
+        if step == 1 or step % 5 == 0 or step == total:
+            report_progress(stage, step, total)
+        return callback_kwargs
+
     with torch.inference_mode():
         clip = pipeline(
             prompt=prompt,
@@ -188,6 +204,7 @@ def render_shot(pipeline, prompt, seed, shot_settings, **conditioning):
             max_sequence_length=226,
             output_type="np",
             generator=torch.Generator(device="cpu").manual_seed(seed),
+            callback_on_step_end=on_step,
             **shot_settings,
             **conditioning,
         ).frames[0]
@@ -214,24 +231,27 @@ if has_reference:
         reference = ImageOps.fit(ImageOps.exif_transpose(portrait).convert("RGB"), (settings["width"], settings["height"]), centering=(0.5, 0.35))
 try:
     if opening_frames or not has_reference:
+        report_progress("loading_opening" if opening_frames else "loading_main")
         pipe = load_pipeline(CogVideoXPipeline, MODEL_ID, opening_cache)
     if opening_frames:
         opening_settings = {**settings, "num_frames": opening_frames, "num_inference_steps": 25}
-        clips.append(render_shot(pipe, OPENING_PROMPT, SEED ^ 0x9E3779B9, opening_settings))
+        clips.append(render_shot(pipe, OPENING_PROMPT, SEED ^ 0x9E3779B9, opening_settings, "opening"))
     if has_reference:
         if opening_frames:
             del pipe
             gc.collect()
             torch.cuda.empty_cache()
             shutil.rmtree(opening_cache)
+        report_progress("loading_main")
         pipe = load_pipeline(CogVideoXImageToVideoPipeline, main_model, CACHE_DIR / "image-video")
-        clips.append(render_shot(pipe, PROMPT, SEED, settings, image=reference))
+        clips.append(render_shot(pipe, PROMPT, SEED, settings, "main", image=reference))
     else:
-        clips.append(render_shot(pipe, PROMPT, SEED, settings))
+        clips.append(render_shot(pipe, PROMPT, SEED, settings, "main"))
 except torch.OutOfMemoryError:
     print("Out of GPU memory. Restart the session and try the quick preset.")
     raise
 frames = np.concatenate(clips, axis=0) if opening_frames else clips[0]
+report_progress("exporting")
 ''')
 markdown('''
 ## Save, preview, and download

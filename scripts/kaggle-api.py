@@ -12,6 +12,26 @@ class BridgeError(RuntimeError):
     """An error safe to show without revealing the provider response."""
 
 
+def stream_progress(api, kernel):
+    for event in api.kernels_logs_stream(kernel):
+        data = event.get("data", "") if isinstance(event, dict) else ""
+        if not isinstance(data, str):
+            continue
+        for line in data.splitlines():
+            line = line.strip()
+            if line.startswith("STUDIO_PROGRESS "):
+                try:
+                    progress = json.loads(line.removeprefix("STUDIO_PROGRESS "))
+                except ValueError:
+                    continue
+            elif line.startswith("Loaded ") and "CogVideoX" in line:
+                progress = {"stage": "model_loaded", "step": 0, "total": 0}
+            else:
+                continue
+            print(json.dumps({"progress": progress}), file=sys.__stdout__, flush=True)
+    return {"complete": True}
+
+
 def run(data):
     action = data["action"]
     for key in ("KAGGLE_API_TOKEN", "KAGGLE_USERNAME", "KAGGLE_KEY"):
@@ -55,6 +75,8 @@ def run(data):
             result = api.kernels_status(data["kernel"])
             state = getattr(result.status, "name", str(result.status)).lower()
             return {"status": state}
+        if action == "progress":
+            return stream_progress(api, data["kernel"])
         if action == "output":
             token = None
             files = []
