@@ -30,7 +30,7 @@ function sceneCard(scene, { project, csrfToken, comfyConfigured }) {
   return `
   <article class="ed-scene" id="scene-${id}" data-scene-id="${id}" data-status="${key}"${busy ? ` data-progress-url="/scenes/${id}/progress"` : ""}>
     <header class="ed-scene-head">
-      <button type="button" class="ed-collapse" aria-expanded="true" aria-controls="scene-body-${id}" aria-label="Collapse scene">
+      <button type="button" class="ed-icon-btn ed-collapse" aria-expanded="true" aria-controls="scene-body-${id}" aria-label="Collapse scene">
         <i class="bi bi-chevron-down"></i>
       </button>
       <span class="ed-scene-num">SCENE #${pad(scene.order_index)}</span>
