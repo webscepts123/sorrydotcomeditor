@@ -640,6 +640,14 @@ export class ProductionController extends Controller {
           [row.id]
         )
       ]);
+      let kaggleUsername = "";
+      let kaggleConnectionMessage = "Connect Kaggle to this studio account to recreate the video.";
+      try {
+        const credentials = await this.service("kaggle").credentials(this.context.session.userId);
+        kaggleUsername = credentials?.username ?? "";
+      } catch (error) {
+        kaggleConnectionMessage = error.message;
+      }
       return this.render("scenes", {
         title: `Sequence #${row.order_index}`,
         message: takeFlash(this.context),
@@ -660,6 +668,8 @@ export class ProductionController extends Controller {
         progressUrl: `/scenes/${row.id}/progress`,
         cancelRenderAction: `/scenes/${row.id}/cancel-render`,
         recreateAction: `/scenes/${row.id}/render-kaggle`,
+        kaggleUsername,
+        kaggleConnectionMessage,
         linkNotebookAction: `/scenes/${row.id}/link-kaggle-notebook`,
         deleteAction: `/scenes/${row.id}/delete`
       });
@@ -1570,13 +1580,15 @@ export class ProductionController extends Controller {
   }
 
   async settingsConnectKaggle() {
+    const sceneId = routeId(this.body?.scene_id);
+    const scene = sceneId ? await this.findOwned("scenes", sceneId) : null;
     try {
       const result = await this.service("kaggle").connect(this.context.session.userId, { username: this.body?.username, secret: this.body?.secret, kind: this.body?.kind === "legacy" ? "legacy" : "token" });
       flash(this.context, `Kaggle connected as ${result.username}.`);
     } catch (error) {
       flash(this.context, `Kaggle not connected. ${error.message}`);
     }
-    return redirect(this.context, "/settings");
+    return redirect(this.context, scene ? `/scenes/${scene.id}` : "/settings");
   }
 
   async settingsDisconnectKaggle() {

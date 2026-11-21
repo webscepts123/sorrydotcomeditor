@@ -110,9 +110,11 @@ html lang="en"
               if videoUrl
                 if renderBusy
                   button.secondary type="button" disabled="disabled" "Recreate video on Kaggle"
-                else
+                else if kaggleUsername
                   form method="post" action="{{recreateAction}}"
                     button.primary type="submit" "Recreate video on Kaggle"
+                else
+                  a.primary-link href="#scene-kaggle-account" "Connect Kaggle to recreate"
               if renderBusy
                 p.muted "A generation job is already running."
               else if comfyConfigured
@@ -128,10 +130,27 @@ html lang="en"
                       button.secondary type="submit" "Check render status"
               form method="post" action="{{deleteAction}}"
                 button.danger type="submit" "Delete sequence"
+          if kaggleUsername
+            p.muted "Kaggle connected as {{kaggleUsername}}"
+          else
+            form#scene-kaggle-account.form-card method="post" action="/settings/kaggle/connect"
+              h2 "Connect Kaggle"
+              p.muted "{{kaggleConnectionMessage}}"
+              p.muted "Use an API token from your Kaggle account settings."
+              a.nav-link href="https://www.kaggle.com/settings/api" target="_blank" rel="noopener noreferrer" "Open Kaggle API settings"
+              input type="hidden" name="scene_id" value="{{scene.id}}"
+              label for="scene-kaggle-username" "Kaggle username"
+              input#scene-kaggle-username type="text" name="username" autocomplete="username" required="required"
+              label for="scene-kaggle-kind" "Credential type"
+              select#scene-kaggle-kind name="kind"
+                option value="token" "API token"
+                option value="legacy" "Legacy API key"
+              label for="scene-kaggle-token" "API token or key"
+              input#scene-kaggle-token type="password" name="secret" autocomplete="new-password" required="required"
+              button.primary type="submit" "Connect Kaggle"
           form.form-card method="post" action="{{linkNotebookAction}}"
             h2 "Link a Kaggle notebook"
             p.muted "In Kaggle, use Save Version with Run All to start a saved run. Once it is queued, link the notebook to import its 1080p MP4 automatically."
-            a.nav-link href="{{videoEditorHref}}" "Connect Kaggle in the video editor"
             label for="notebook-url" "Kaggle notebook URL"
             input#notebook-url type="url" name="notebook_url" required="required" maxlength="400" placeholder="https://www.kaggle.com/code/username/notebook"
             if renderBusy

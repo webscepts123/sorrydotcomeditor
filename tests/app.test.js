@@ -147,6 +147,24 @@ test("production page templates render their page-specific controls", async () =
   }
 });
 
+test("scene recreation displays the Kaggle connection required for the signed-in account", async () => {
+  const view = path.resolve("resources/views/scenes.noderframe");
+  const data = {
+    pageType: "show",
+    scene: { id: 5, order_index: 3 },
+    videoUrl: "/public/uploads/scenes/clip.mp4",
+    recreateAction: "/scenes/5/render-kaggle",
+    csrfToken: "scene-token"
+  };
+  const disconnected = await compileFile(view, data);
+  assert.match(disconnected, /action="\/settings\/kaggle\/connect"[^>]*>[\s\S]*?name="_csrf" value="scene-token"[\s\S]*?name="scene_id" value="5"/);
+  assert.doesNotMatch(disconnected, /action="\/scenes\/5\/render-kaggle"/);
+  const connected = await compileFile(view, { ...data, kaggleUsername: "filmmaker" });
+  assert.match(connected, /Kaggle connected as filmmaker/);
+  assert.match(connected, /action="\/scenes\/5\/render-kaggle"/);
+  assert.doesNotMatch(connected, /name="secret"/);
+});
+
 test("studio sidebar renders original navigation and production tools on every app screen", async () => {
   let navigation;
   const controller = new ProductionController({
