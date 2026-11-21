@@ -127,7 +127,7 @@ test("production page templates render their page-specific controls", async () =
     ["planning.noderframe", { pageType: "form", projectOptions: [], fields: [], selectedProjectId: "1", logline: "" }, /Generate story with AI/],
     ["posters.noderframe", { projects: [], hasRows: false, createHref: "/projects/create" }, /Movie Poster Studio/],
     ["tools.noderframe", { title: "Script breakdown", pageType: "script", rows: [], hasRows: false, scriptText: "" }, /Parse into scenes/],
-    ["settings.noderframe", { fields: [] }, /Provider setup/],
+    ["settings.noderframe", { fields: [] }, /ComfyUI render server/],
     ["timeline.noderframe", { title: "Timeline", rows: [], hasRows: false }, /Timeline is empty/],
     ["videoeditor.noderframe", { title: "Video editor", rows: [], hasRows: false, selectedVideoUrl: "", selectedSceneTitle: "" }, /CINEMATIC LOOK/]
   ];

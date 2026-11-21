@@ -199,3 +199,18 @@ input, textarea, select { border-color: #495057; background: #000; color: #fff; 
 @keyframes render-progress-pulse { 50% { background: rgba(128,196,220,.04); } }
 @media (max-width: 600px) { .render-progress-steps { flex-wrap: wrap; } .render-progress-steps li { flex: 1 1 40%; } }
 @media (prefers-reduced-motion: reduce) { .render-progress-fill, .render-progress-steps li { transition: none; animation: none; } .render-progress-fill::after { display: none; } }
+
+/* Settings page */
+.settings-card { display: grid; gap: 10px; margin: 18px 0; max-width: 860px; }
+.settings-card h2 { margin: 0; }
+.settings-form { display: grid; gap: 6px; }
+.settings-form .action-row { margin: 10px 0 0; }
+.field-help { margin: 0 0 6px; color: #6c757d; font-size: 12px; }
+.settings-state { margin: 0; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: #adb5bd; }
+.settings-state::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: #6c757d; vertical-align: middle; }
+.settings-state.is-on { color: #3fb37f; }
+.settings-state.is-on::before { background: #3fb37f; box-shadow: 0 0 8px #3fb37f; }
+.settings-state.is-off { color: #ff6b6b; }
+.settings-state.is-off::before { background: #ff6b6b; }
+.link-button { justify-self: start; padding: 0; border: 0; background: none; color: #80c4dc; font-size: 12px; text-decoration: underline; cursor: pointer; }
+.link-button:hover { color: #fff; }

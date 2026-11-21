@@ -8,6 +8,7 @@ import { renderProductionEditor } from "../Views/ProductionEditor.js";
 import { mediaUrl } from "../Views/studio-helpers.js";
 import { createNotebookTransfer, readNotebookTransfer } from "../Services/KaggleNotebookTransfer.js";
 import { ComfyRenderFailedError } from "../Services/ComfyVideoService.js";
+import { RUNTIME_SETTINGS, listWorkflows, runtimeSettingsView, saveRuntimeSettings } from "../Services/RuntimeSettings.js";
 
 const resourceDefinitions = {
   projects: {
@@ -618,11 +619,8 @@ export class ProductionController extends Controller {
         kaggleRender: String(row.generation_job_id ?? "").startsWith("kaggle:"),
         videoEditorHref: `/projects/${row.project_id}/videoeditor?scene_id=${row.id}`,
         syncAction: `/scenes/${row.id}/sync-render`,
-<<<<<<< HEAD
         progressUrl: `/scenes/${row.id}/progress`,
-=======
         linkNotebookAction: `/scenes/${row.id}/link-kaggle-notebook`,
->>>>>>> 4a58eaa597faa2e25a4a3f62d87351399842966d
         deleteAction: `/scenes/${row.id}/delete`
       });
     }
@@ -1417,12 +1415,74 @@ export class ProductionController extends Controller {
   }
 
   async settings() {
-    const variables = ["APP_NAME", "APP_URL", "DB_TYPE", "DB_HOST", "DB_NAME", "AI_ENABLED", "AI_PROVIDER", "COMFYUI_URL"];
+    this.context.response.setHeader("Cache-Control", "private, no-store");
+    const variables = ["APP_NAME", "APP_URL", "DB_TYPE", "DB_HOST", "DB_NAME", "AI_ENABLED", "AI_PROVIDER"];
+    const workflows = await listWorkflows();
+    const editable = runtimeSettingsView().map((setting) => {
+      const options = setting.workflow ? [...new Set([setting.value, ...workflows].filter(Boolean))] : [];
+      return { ...setting, options: options.map((value) => ({ value, label: value, selected: value === setting.value })), hasOptions: options.length > 0 };
+    });
+    let kaggle;
+    try {
+      kaggle = await Promise.race([
+        this.service("kaggle").connection(this.context.session.userId),
+        new Promise((resolve) => setTimeout(() => resolve({ connected: false, available: false, message: "The Kaggle runtime did not respond in time. Reload to check again." }), 15000))
+      ]);
+    } catch (error) {
+      kaggle = { connected: false, available: false, message: error.message };
+    }
     return this.render("settings", {
       message: takeFlash(this.context),
       navigation,
+      comfySettings: editable.filter((setting) => setting.group === "comfy"),
+      localSettings: editable.filter((setting) => setting.group === "local"),
+      kaggleConnected: Boolean(kaggle.connected),
+      kaggleAvailable: kaggle.available !== false,
+      kaggleMessage: kaggle.message ?? "",
+      kaggleUsername: kaggle.username ?? "",
+      kagglePython: process.env.KAGGLE_PYTHON || "Automatic",
       fields: variables.map((name) => ({ name, label: name, value: process.env[name] ?? "", type: "text" })),
     });
+  }
+
+  async saveSettings() {
+    const values = {};
+    for (const setting of RUNTIME_SETTINGS) if (typeof this.body?.[setting.name] === "string") values[setting.name] = this.body[setting.name];
+    const reset = RUNTIME_SETTINGS.map(({ name }) => name).filter((name) => this.body?.reset === name);
+    try {
+      await saveRuntimeSettings(values, { reset });
+      flash(this.context, reset.length ? "Setting reset to the server .env value." : "Settings saved. New renders use them immediately.");
+    } catch (error) {
+      flash(this.context, `Settings not saved. ${error.message}`);
+    }
+    return redirect(this.context, "/settings");
+  }
+
+  async testRenderConnection() {
+    const local = this.body?.target === "local";
+    try {
+      const status = local ? await this.service("comfyLocal")().status() : await this.comfy.status();
+      flash(this.context, `${local ? "Local Wan" : "ComfyUI"} is online${status.gpu_name ? ` — ${status.gpu_name}` : ""}${status.comfyui_version ? ` (ComfyUI ${status.comfyui_version})` : ""}.`);
+    } catch (error) {
+      flash(this.context, `${local ? "Local Wan" : "ComfyUI"} is not reachable: ${error.message}`);
+    }
+    return redirect(this.context, "/settings");
+  }
+
+  async settingsConnectKaggle() {
+    try {
+      const result = await this.service("kaggle").connect(this.context.session.userId, { username: this.body?.username, secret: this.body?.secret, kind: this.body?.kind === "legacy" ? "legacy" : "token" });
+      flash(this.context, `Kaggle connected as ${result.username}.`);
+    } catch (error) {
+      flash(this.context, `Kaggle not connected. ${error.message}`);
+    }
+    return redirect(this.context, "/settings");
+  }
+
+  async settingsDisconnectKaggle() {
+    await this.service("kaggle").disconnect(this.context.session.userId);
+    flash(this.context, "Kaggle account disconnected.");
+    return redirect(this.context, "/settings");
   }
 
   async posters() {
@@ -1557,14 +1617,9 @@ export function registerProductionRoutes(app) {
   app.post("/tools/script/parse", ProductionController.handle("parseScript"));
   app.post("/scenes/:id/render", ProductionController.handle("renderScene"));
   app.post("/scenes/:id/render-local", ProductionController.handle("renderLocalScene"));
-<<<<<<< HEAD
   app.get("/scenes/:id/progress", ProductionController.handle("sceneProgress"));
-  app.post("/scenes/:id/sync-render",ProductionController.handle("syncSceneRender"));
-=======
-  app.post("/scenes/:id/generate-seedance", ProductionController.handle("generateSeedanceForScene"));
   app.post("/scenes/:id/link-kaggle-notebook", ProductionController.handle("linkKaggleNotebook"));
   app.post("/scenes/:id/sync-render", ProductionController.handle("syncSceneRender"));
->>>>>>> 4a58eaa597faa2e25a4a3f62d87351399842966d
   app.post("/scenes/:id/attach-video", ProductionController.handle("attachVideo"));
   app.post("/posters/generate-ideas", ProductionController.handle("generatePosterIdeas"));
   app.post("/posters/generate", ProductionController.handle("generatePoster"));
@@ -1609,6 +1664,10 @@ export function registerProductionRoutes(app) {
   app.get("/posters", ProductionController.handle("posters"));
   app.post("/projects/:id/generate-poster", ProductionController.handle("generatePoster"));
   app.get("/settings", ProductionController.handle("settings"));
+  app.post("/settings", ProductionController.handle("saveSettings"));
+  app.post("/settings/test-render", ProductionController.handle("testRenderConnection"));
+  app.post("/settings/kaggle/connect", ProductionController.handle("settingsConnectKaggle"));
+  app.post("/settings/kaggle/disconnect", ProductionController.handle("settingsDisconnectKaggle"));
   for (const tool of ["sync-face", "gen-score", "script"]) {
     app.get(`/tools/${tool}`, (context) => new ProductionController(context).toolPage(tool));
   }

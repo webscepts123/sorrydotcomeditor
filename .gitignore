@@ -39,6 +39,7 @@ platforms/mobile/www/
 platforms/mobile/*/www/
 storage/mobile-ui/
 storage/kaggle-api/
+storage/settings/
 storage/kaggle-notebooks/
 platforms/native/
 platforms/desktop/www/

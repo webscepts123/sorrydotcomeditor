@@ -35,18 +35,84 @@ html lang="en"
         h1 "System settings"
         if message
           p.notice "{{message}}"
+        article.record-card.settings-card
+          h2 "Kaggle notebook"
+          p.muted "Scenes render on Kaggle's free GPU with the CogVideoX notebook. Your API token is encrypted on the server and never shown again."
+          if kaggleConnected
+            p.settings-state.is-on "Connected as {{kaggleUsername}}"
+            form method="post" action="/settings/kaggle/disconnect"
+              button.danger type="submit" "Disconnect Kaggle"
+          else
+            if kaggleAvailable
+              p.settings-state "Not connected"
+            else
+              p.settings-state.is-off "Kaggle runtime unavailable"
+            p.muted "{{kaggleMessage}}"
+            form.settings-form method="post" action="/settings/kaggle/connect" autocomplete="off"
+              label for="kaggle-username" "Kaggle username"
+              input#kaggle-username type="text" name="username" required="required" maxlength="64" autocomplete="off" spellcheck="false"
+              label for="kaggle-secret" "API token"
+              input#kaggle-secret type="password" name="secret" required="required" maxlength="4096" autocomplete="new-password"
+              p.field-help "Kaggle → Settings → API → Create New Token. Paste the token, or the key value from kaggle.json."
+              label for="kaggle-kind" "Token type"
+              select#kaggle-kind name="kind"
+                option value="token" selected="selected" "API token (new)"
+                option value="legacy" "Legacy key from kaggle.json"
+              button.primary type="submit" "Connect Kaggle"
+          div.detail-row
+            strong "Kaggle Python runtime"
+            p "{{kagglePython}}"
+        article.record-card.settings-card
+          h2 "ComfyUI render server"
+          p.muted "Used by the Queue ComfyUI render button on scenes. Changes apply to new renders immediately — no restart needed."
+          form.settings-form method="post" action="/settings"
+            for setting in comfySettings
+              label for="{{setting.name}}" "{{setting.label}}"
+              if setting.hasOptions
+                select id="{{setting.name}}" name="{{setting.name}}"
+                  for option in setting.options
+                    if option.selected
+                      option value="{{option.value}}" selected="selected" "{{option.label}}"
+                    else
+                      option value="{{option.value}}" "{{option.label}}"
+              else
+                input id="{{setting.name}}" type="text" name="{{setting.name}}" value="{{setting.value}}" placeholder="{{setting.placeholder}}" spellcheck="false"
+              p.field-help "{{setting.help}} · {{setting.source}}"
+              if setting.overridden
+                button.link-button type="submit" name="reset" value="{{setting.name}}" "Reset to server value"
+            div.action-row
+              button.primary type="submit" "Save ComfyUI settings"
+          form method="post" action="/settings/test-render"
+            input type="hidden" name="target" value="comfy"
+            button.secondary type="submit" "Test ComfyUI connection"
+        article.record-card.settings-card
+          h2 "Local Wan 2.1 (this machine)"
+          p.muted "ComfyUI running on the same computer as the editor. Start it with npm run wan:start."
+          form.settings-form method="post" action="/settings"
+            for setting in localSettings
+              label for="{{setting.name}}" "{{setting.label}}"
+              if setting.hasOptions
+                select id="{{setting.name}}" name="{{setting.name}}"
+                  for option in setting.options
+                    if option.selected
+                      option value="{{option.value}}" selected="selected" "{{option.label}}"
+                    else
+                      option value="{{option.value}}" "{{option.label}}"
+              else
+                input id="{{setting.name}}" type="text" name="{{setting.name}}" value="{{setting.value}}" placeholder="{{setting.placeholder}}" spellcheck="false"
+              p.field-help "{{setting.help}} · {{setting.source}}"
+              if setting.overridden
+                button.link-button type="submit" name="reset" value="{{setting.name}}" "Reset to server value"
+            div.action-row
+              button.primary type="submit" "Save Local Wan settings"
+          form method="post" action="/settings/test-render"
+            input type="hidden" name="target" value="local"
+            button.secondary type="submit" "Test Local Wan connection"
         article.record-card
-          h2 "Runtime configuration"
-          p.muted "Set credentials and connection strings in the server environment. Secrets are not displayed or changed in this page."
+          h2 "Server configuration"
+          p.muted "Database, AI keys and the Kaggle Python path are set in the server .env file and are not editable here."
           for field in fields
             div.detail-row
               strong "{{field.label}}"
               p "{{field.value}}"
-        article.record-card
-          h2 "Provider setup"
-          p "AI stories and character profiles: AI_ENABLED, AI_PROVIDER, and the matching AI API key."
-          p "Poster and character images: OPENAI_API_KEY."
-          p "ComfyUI rendering: COMFYUI_URL and COMFYUI_VIDEO_WORKFLOW."
-          p "Local Wan 2.1: WAN_LOCAL_URL and WAN_LOCAL_WORKFLOW. Installed under D:\\AI; start with npm run wan:start. Check availability in the editor's AI Engine tab."
-          p "Database: configure DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, and DB_NAME before running migrations."
           p.muted "Application health endpoint: /health"

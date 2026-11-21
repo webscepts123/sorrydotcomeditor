@@ -4,8 +4,11 @@ import { registerProductionRoutes, requireAuthentication } from "./app/Controlle
 import { ComfyVideoService } from "./app/Services/ComfyVideoService.js";
 import { LocalWanService } from "./app/Services/LocalWanService.js";
 import { KaggleApiService } from "./app/Services/KaggleApiService.js";
+import { loadRuntimeSettings } from "./app/Services/RuntimeSettings.js";
 
 loadEnvironment();
+// Render settings saved from /settings override .env values.
+await loadRuntimeSettings();
 const { default: config } = await import("./noderyx.config.js");
 const database = await connect(config.database);
 
