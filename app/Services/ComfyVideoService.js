@@ -41,7 +41,7 @@ export class ComfyVideoService {
     workflow = replaceTokens(workflow, {
       "{{PROMPT}}": [
         "Create a photorealistic live-action cinematic cutscene with natural movement, film lighting and professional camera work.",
-        `Scene action: ${scene.script_segment ?? ""}`,
+        `Scene action: ${scene.prompt || scene.script_segment || ""}`,
         cast.length ? `Cast continuity:\n${cast.map((character) => `${character.name} (${character.role ?? "supporting"}): ${character.description ?? ""}\n${character.personality ?? ""}`).join("\n\n")}` : "",
         "No animation, cartoons, illustrations, game graphics, subtitles, logos, or watermarks."
       ].filter(Boolean).join("\n\n"),

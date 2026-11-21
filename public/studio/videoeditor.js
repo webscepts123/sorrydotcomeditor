@@ -1142,11 +1142,7 @@
             ", octane render, golden hour rim lighting, ultra detailed textures"
         ];
         textarea.value += suffixes[Math.floor(Math.random() * suffixes.length)];
-    }
-
-    function randomizeSeed() {
-        const seedInput = document.getElementById('aiSeedInput');
-        if (seedInput) seedInput.value = Math.floor(Math.random() * 99999999);
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
     // 15. Timeline Tools & Zoom
@@ -1256,7 +1252,6 @@ document.querySelectorAll('[data-studio-click="13"]').forEach(element => element
 
 document.querySelectorAll('[data-studio-click="14"]').forEach(element => element.addEventListener("click", function(event) { const result = (() => { enhancePrompt() } )(); if (result === false) event.preventDefault(); }));
 
-document.querySelectorAll('[data-studio-click="15"]').forEach(element => element.addEventListener("click", function(event) { const result = (() => { randomizeSeed() } )(); if (result === false) event.preventDefault(); }));
 
 document.querySelectorAll('[data-studio-click="16"]').forEach(element => element.addEventListener("click", function(event) { const result = (() => { switchWorkspace('edit') } )(); if (result === false) event.preventDefault(); }));
 
@@ -1428,7 +1423,6 @@ document.querySelectorAll('[data-studio-click="99"]').forEach(element => element
 
 document.querySelectorAll('[data-studio-click="100"]').forEach(element => element.addEventListener("click", function(event) { const result = (() => { enhancePrompt() } )(); if (result === false) event.preventDefault(); }));
 
-document.querySelectorAll('[data-studio-click="101"]').forEach(element => element.addEventListener("click", function(event) { const result = (() => { randomizeSeed() } )(); if (result === false) event.preventDefault(); }));
 
 document.querySelectorAll('[data-studio-change="102"]').forEach(element => element.addEventListener("change", function(event) { const result = (() => { setScopeMask(this.value) } )(); if (result === false) event.preventDefault(); }));
 

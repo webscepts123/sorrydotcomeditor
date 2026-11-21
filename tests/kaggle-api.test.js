@@ -10,7 +10,7 @@ import { renderStudio } from "../app/Views/Studio.js";
 test("scene studio loads the Kaggle client and retains its document head", () => {
   const html = renderStudio({ project: { id: 2, title: "Film" }, scenes: [], csrfToken: "csrf" });
   assert.match(html, /src="\/public\/studio\/kaggle.js" defer><\/script>/);
-  assert.match(html, /src="\/public\/studio\/local-wan.js" defer><\/script>/);
+  assert.doesNotMatch(html, /\/public\/studio\/local-wan.js/);
   assert.equal((html.match(/<\/head>/g) || []).length, 1);
 });
 

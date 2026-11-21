@@ -1,5 +1,5 @@
 // Original VOID SHADOW editor interface, ported from the Blade view.
-import { escapeHtml, mediaUrl, localWanControls } from "./studio-helpers.js";
+import { escapeHtml, mediaUrl, kaggleControls } from "./studio-helpers.js";
 export function renderProductionEditor({ project, scenes, characters = [], currentScene = null, csrfToken = "" }) {
 const currentSceneId = currentScene?.id;
 const currentSceneIndex = Math.max(0, scenes.findIndex(s => s.id === currentSceneId));
@@ -167,7 +167,7 @@ output += "                                <input type=\"hidden\" name=\"_csrf\"
 output += "                                <button type=\"submit\" class=\"btn btn-outline-warning w-100 btn-sm rounded-0 small uppercase tracking-widest\">CHECK RENDER STATUS</button>\n";
 output += "                            </form>\n";
 }
-output += localWanControls(scene, csrfToken);
+output += kaggleControls(scene, csrfToken);
 if (scene.generation_error) {
 output += "                            <small class=\"text-danger d-block mt-2\">" + escapeHtml(scene.generation_error) + "</small>\n";
 }
@@ -203,5 +203,5 @@ output += "\n";
 output += "<script src=\"/public/studio/editor.js\" defer></script>\n";
 output += "\n";
 output += "<script src=\"/public/studio/bootstrap.bundle.min.js\"></script></body></html>";
-return output.replace('</head>', '<script src="/public/studio/local-wan.js" defer></script><script src="/public/studio/kaggle.js" defer></script></head>');
+return output.replace('</head>', '<script src="/public/studio/kaggle.js" defer></script></head>');
 }

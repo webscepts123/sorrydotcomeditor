@@ -1046,8 +1046,13 @@ export class ProductionController extends Controller {
   async saveKagglePrompt() {
     const scene = await this.findOwned("scenes", this.params.id);
     const prompt = typeof this.body?.prompt === "string" ? this.body.prompt.trim() : "";
-    if (!prompt || prompt.length > 8000) return this.abort(422, "Enter a video prompt between 1 and 8000 characters.");
+    if (!prompt || prompt.length > 8000) {
+      const message = "Enter a video prompt between 1 and 8000 characters.";
+      if (this.context.request?.headers?.accept?.includes("application/json")) return this.json({ message }, 422);
+      return this.abort(422, message);
+    }
     await this.models.scenes.update(scene.id, { prompt });
+    if (this.context.request?.headers?.accept?.includes("application/json")) return this.json({ message: "Prompt saved." });
     flash(this.context, "Video prompt saved. Download the scene notebook for 1080p output.");
     return redirect(this.context, `/projects/${scene.project_id}/videoeditor?scene_id=${scene.id}`);
   }

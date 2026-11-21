@@ -357,7 +357,9 @@ test("original studio renders selected owned media and supports original scene l
   await controller.projectVideoEditor();
   assert.match(rendered, /id="mainPlayer" src="\/public\/uploads\/scenes\/clip.mp4"/);
   assert.match(rendered, /name="_csrf" value="test-csrf"/);
-  assert.match(rendered, /action="\/scenes\/5"/);
+  assert.match(rendered, /action="\/scenes\/5\/kaggle-prompt"/);
+  assert.equal((rendered.match(/<textarea[^>]+name="prompt"/g) ?? []).length, 1);
+  assert.doesNotMatch(rendered, /Wan 2\.1|\/render-local|name="script_segment"/);
   assert.match(rendered, /action="\/scenes\/5\/render"/);
   assert.match(rendered, /action="\/projects\/12\/render-batch"/);
   for (const workspace of ["edit", "color", "fairlight", "deliver"]) {
@@ -370,7 +372,7 @@ test("original studio renders selected owned media and supports original scene l
   context.query.active_scene = "4";
   await controller.projectVideoEditor();
   assert.match(rendered, /MEDIA OFFLINE/);
-  assert.match(rendered, /action="\/scenes\/4"/);
+  assert.match(rendered, /action="\/scenes\/4\/kaggle-prompt"/);
   context.query.scene_id = "99";
   await assert.rejects(() => controller.projectVideoEditor(), /404 Scene not found/);
 });

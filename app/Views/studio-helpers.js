@@ -15,44 +15,70 @@ export function mediaUrl(value, publicRoot = path.resolve(process.cwd(), "public
   return `/public/${stored ? "storage/" : ""}${relative}`;
 }
 
-export function localWanControls(scene, csrfToken) {
+export function aiEngineControls(scene, csrfToken) {
   const id = escapeHtml(scene.id);
   const busy = ["Rendering", "Processing"].includes(scene.status);
-  const localJob = String(scene.generation_job_id ?? "").startsWith("local:");
-  return `${kaggleControls(scene, csrfToken)}<section class="p-2 mt-2 border border-secondary" data-local-wan>
-    <strong class="text-info small">WAN 2.1 — THIS COMPUTER</strong>
-    <p class="text-secondary small mb-2" data-local-wan-status role="status">Checking local worker…</p>
-    <p class="text-secondary small">GTX 970 / 4 GB: experimental CPU mode. Save your scene prompt first. First-time generation may be very slow.</p>
-    <button type="button" class="nle-btn btn btn-sm btn-outline-secondary" data-local-wan-check>Check local worker</button>
-    <form method="post" action="/scenes/${id}/render-local" class="mt-2">
-      <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
-      <input type="hidden" name="return_to_videoeditor" value="1">
-      <button type="submit" class="nle-btn btn btn-sm btn-outline-info w-100" data-local-wan-render ${busy ? 'data-busy="true"' : ''} disabled>Render with local Wan 2.1</button>
-    </form>
-    ${localJob ? `<form method="post" action="/scenes/${id}/sync-render" class="mt-2"><input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}"><button class="nle-btn btn btn-sm btn-outline-warning w-100" type="submit">Check local render / import video</button></form>` : ''}
-    ${scene.generation_error ? `<p class="text-danger small">${escapeHtml(scene.generation_error)}</p>` : ''}
-  </section>`;
+  return `<div class="ai-engine">
+    ${kaggleControls(scene, csrfToken, { inspector: true })}
+    <details class="ai-engine-options">
+      <summary>ComfyUI</summary>
+      <p>Save the prompt before starting a ComfyUI render.</p>
+      <form method="post" action="/scenes/${id}/render">
+        <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
+        <button type="submit" class="nle-btn w-100" ${busy ? "disabled" : ""}>Render with ComfyUI</button>
+      </form>
+      ${scene.generation_job_id && !/^(kaggle|local):/.test(scene.generation_job_id) ? `<form method="post" action="/scenes/${id}/sync-render">
+        <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
+        <button type="submit" class="nle-btn w-100">Check ComfyUI render</button>
+      </form>` : ""}
+    </details>
+  </div>`;
 }
 
-export function kaggleControls(scene, csrfToken) {
-  return `<section class="p-2 mt-2 border border-info" data-kaggle-wan data-scene-id="${escapeHtml(scene.id)}" data-job-active="${String(String(scene.generation_job_id || '').startsWith('kaggle:') && ['Rendering', 'Processing'].includes(scene.status))}">
+export function kaggleControls(scene, csrfToken, { inspector = false } = {}) {
+  const id = escapeHtml(scene.id);
+  const busy = ["Rendering", "Processing"].includes(scene.status);
+  const kaggleJob = String(scene.generation_job_id ?? "").startsWith("kaggle:");
+  if (inspector) {
+    return `<section class="ai-engine-main" data-kaggle-wan data-scene-id="${id}" data-job-active="${busy && kaggleJob}" data-other-job-active="${busy && !kaggleJob}">
+      <div class="ai-engine-heading">
+        <h2>Kaggle GPU</h2>
+        <span>1080p upscaled</span>
+      </div>
+      <form method="post" action="/scenes/${id}/kaggle-prompt" data-ai-engine-prompt>
+        <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
+        <label for="aiPromptTextarea">Video prompt</label>
+        <textarea id="aiPromptTextarea" name="prompt" rows="5" maxlength="8000" required class="nle-textarea w-100" placeholder="Describe the action, camera movement, and lighting.">${escapeHtml(scene.prompt || scene.script_segment || "")}</textarea>
+        <div class="ai-engine-prompt-actions">
+          <button type="submit" class="nle-btn">Save prompt</button>
+          <button type="button" class="nle-btn" data-studio-click="100">Enhance prompt</button>
+        </div>
+      </form>
+      <button type="button" class="nle-btn nle-btn-primary w-100" data-kaggle-generate disabled>Generate on Kaggle</button>
+      <p role="status" data-kaggle-progress-message>${busy && !kaggleJob ? "Another worker is rendering this scene." : ""}</p>
+      <div class="ai-engine-job-actions">
+        <button type="button" class="nle-btn" data-kaggle-progress ${kaggleJob ? "" : "hidden"}>Check progress</button>
+        <a class="nle-btn" data-kaggle-notebook-link hidden target="_blank" rel="noopener noreferrer">Open Kaggle run</a>
+        ${busy && !kaggleJob ? `<a class="nle-btn" href="/scenes/${id}">View scene status</a>` : ""}
+      </div>
+      ${kaggleConnectionControls(csrfToken, "Kaggle account")}
+      <details class="ai-engine-options">
+        <summary>Manual notebook</summary>
+        <p>Save the prompt, open the notebook, then use Kaggle’s Save Version with Run All. Link the saved run from the scene page.</p>
+        <div class="ai-engine-job-actions">
+          <a class="nle-btn" href="/scenes/${id}/kaggle-open" target="_blank" rel="noopener noreferrer">Open notebook</a>
+          <a class="nle-btn" href="/scenes/${id}/kaggle-notebook" download>Download notebook</a>
+          <a class="nle-btn" href="/scenes/${id}/kaggle-job" download>Export scene JSON</a>
+          <a class="nle-btn" href="/scenes/${id}">Link saved run</a>
+        </div>
+      </details>
+    </section>`;
+  }
+  return `<section class="p-2 mt-2 border border-info" data-kaggle-wan data-scene-id="${id}" data-job-active="${busy && kaggleJob}">
     <strong class="text-info small">COGVIDEOX-5B — KAGGLE GPU</strong>
     <p class="text-info small"><strong>Full HD output: 1920 × 1080</strong></p>
     <p class="text-secondary small">CogVideoX-5B generates 720×480 at 8 fps (about 6 seconds), then upscales to 1080p. This increases output size; it does not add native 1080p detail.</p>
-    <p class="small" role="status" aria-live="polite" data-kaggle-connection>Checking Kaggle connection…</p>
-    <details data-kaggle-connect-panel>
-      <summary class="nle-btn mb-2">Connect Kaggle account</summary>
-      <p class="small">Open <a href="https://www.kaggle.com/settings/api" target="_blank" rel="noopener noreferrer">Kaggle API settings</a> and generate a token. Enter it here once.</p>
-      <form method="post" action="/wan-kaggle/connect" data-kaggle-connect class="mb-3">
-        <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
-        <label class="small d-block mb-2">Kaggle username<input name="username" required autocomplete="off" class="nle-input w-100" placeholder="Your Kaggle username"></label>
-        <label class="small d-block mb-2">Credential type<select name="kind" class="nle-select w-100"><option value="token">API token</option><option value="legacy">Legacy API key (kaggle.json)</option></select></label>
-        <label class="small d-block mb-2">API token or key<input type="password" name="secret" required autocomplete="new-password" class="nle-input w-100"></label>
-        <p class="text-secondary small">Stored encrypted on the studio server for your account. It is never included in scene notebooks.</p>
-        <button type="submit" class="nle-btn w-100">Connect Kaggle</button>
-      </form>
-    </details>
-    <button type="button" class="nle-btn mb-2" data-kaggle-disconnect hidden>Disconnect Kaggle</button>
+    ${kaggleConnectionControls(csrfToken, "Connect Kaggle account")}
     <form method="post" action="/scenes/${escapeHtml(scene.id)}/kaggle-prompt" class="mb-3">
       <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
       <label class="small d-block mb-1" for="kaggle-prompt-${escapeHtml(scene.id)}">Video prompt</label>
@@ -77,4 +103,20 @@ export function kaggleControls(scene, csrfToken) {
     </div>
     </details>
   </section>`;
+}
+
+function kaggleConnectionControls(csrfToken, summary) {
+  return `<details class="ai-engine-options" data-kaggle-connect-panel>
+    <summary>${summary}</summary>
+    <p class="small" role="status" data-kaggle-connection>Checking Kaggle connection…</p>
+    <form method="post" action="/wan-kaggle/connect" data-kaggle-connect>
+      <input type="hidden" name="_csrf" value="${escapeHtml(csrfToken)}">
+      <p class="small">Create a token in <a href="https://www.kaggle.com/settings/api" target="_blank" rel="noopener noreferrer">Kaggle API settings</a>.</p>
+      <label class="small d-block mb-2">Kaggle username<input name="username" required autocomplete="username" class="nle-input w-100"></label>
+      <label class="small d-block mb-2">Credential type<select name="kind" class="nle-select w-100"><option value="token">API token</option><option value="legacy">Legacy API key (kaggle.json)</option></select></label>
+      <label class="small d-block mb-2">API token or key<input type="password" name="secret" required autocomplete="new-password" class="nle-input w-100"></label>
+      <button type="submit" class="nle-btn w-100">Connect Kaggle</button>
+    </form>
+    <button type="button" class="nle-btn" data-kaggle-disconnect hidden>Disconnect Kaggle</button>
+  </details>`;
 }

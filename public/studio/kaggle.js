@@ -9,6 +9,8 @@ for (const panel of document.querySelectorAll('[data-kaggle-wan]')) {
   const disconnect = panel.querySelector('[data-kaggle-disconnect]');
   const prompt = panel.querySelector('textarea[name="prompt"]');
   const link = panel.querySelector('[data-kaggle-notebook-link]');
+  const promptForm = panel.querySelector('[data-ai-engine-prompt]');
+  const otherJobActive = panel.dataset.otherJobActive === 'true';
   let connected = false, active = panel.dataset.jobActive === 'true', checking = false, submitting = false, dirty = false;
   prompt.addEventListener('input', () => { dirty = true; });
   async function request(url, body) {
@@ -23,18 +25,38 @@ for (const panel of document.querySelectorAll('[data-kaggle-wan]')) {
     return data;
   }
   function buttons() {
-    generate.disabled = !connected || active || submitting;
-    generate.textContent = active ? 'Scene generation in progress…' : 'Generate this scene · Kaggle GPU';
+    generate.disabled = !connected || active || otherJobActive || submitting;
+    generate.textContent = active ? 'Kaggle render in progress…' : 'Generate on Kaggle';
+    if (promptForm && active) check.hidden = false;
     disconnect.hidden = !connected;
   }
   async function loadConnection() {
     try {
       const data = await request('/wan-kaggle/connection');
       connected = data.connected; connection.textContent = data.message;
-      details.open = !connected && data.available;
+      if (promptForm) {
+        details.querySelector('summary').textContent = connected ? `Kaggle account · ${data.username}` : 'Connect Kaggle account';
+      } else {
+        details.open = !connected && data.available;
+      }
     } catch (error) { connection.textContent = error.message; }
     buttons();
   }
+  promptForm?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = promptForm.querySelector('[type="submit"]');
+    const value = prompt.value;
+    button.disabled = true;
+    try {
+      const data = await request(promptForm.getAttribute('action'), { prompt: value });
+      dirty = prompt.value !== value;
+      message.textContent = data.message;
+    } catch (error) {
+      message.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
   panel.querySelector('[data-kaggle-connect]').addEventListener('submit', async event => {
     event.preventDefault();
     const form = event.currentTarget, button = form.querySelector('button');

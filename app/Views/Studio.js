@@ -78,9 +78,8 @@ output += "\n";
 output += "            <div class=\"nle-menu-group\">\n";
 output += "                <button type=\"button\" class=\"nle-menu-item\">AI Engine</button>\n";
 output += "                <div class=\"nle-menu-dropdown\">\n";
-output += "                    <button type=\"button\" class=\"nle-menu-link\" data-studio-click=\"13\"><span>Wan 2.1 Prompt Studio</span><small>AI</small></button>\n";
+output += "                    <button type=\"button\" class=\"nle-menu-link\" data-studio-click=\"13\"><span>Video Prompt</span><small>AI</small></button>\n";
 output += "                    <button type=\"button\" class=\"nle-menu-link\" data-studio-click=\"14\"><span>Enhance Prompt Style</span><small>Magic</small></button>\n";
-output += "                    <button type=\"button\" class=\"nle-menu-link\" data-studio-click=\"15\"><span>Randomize AI Seed</span><small>Seed</small></button>\n";
 output += "                </div>\n";
 output += "            </div>\n";
 output += "        </div>\n";
@@ -1591,5 +1590,5 @@ output += "\n";
 output += "<script src=\"/public/studio/bootstrap.bundle.min.js\"></script>\n";
 output += "</body>\n";
 output += "</html>\n";
-return output.replace('</head>', '<script src="/public/studio/interaction.js" defer></script><script src="/public/studio/local-wan.js" defer></script><script src="/public/studio/kaggle.js" defer></script></head>');
+return output.replace('</head>', '<script src="/public/studio/interaction.js" defer></script><script src="/public/studio/kaggle.js" defer></script></head>');
 }
